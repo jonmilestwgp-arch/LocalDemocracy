@@ -1,0 +1,8 @@
+Id1,Id2,Relationship
+5,6,Brothers
+12,13,Parent/Child
+15,29,Partners
+30,31,Married
+30,20,Parent/Child
+31,20,Parent/Child
+49,50,Married
