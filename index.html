@@ -232,6 +232,7 @@ function computeWithinRange(d, maxDepth){
   for(let depth=1; depth<=maxDepth && frontier.length; depth++){
     const next = [];
     graphData.links.forEach(l=>{
+      if(isLinkFilteredOut(l)) return; // filtered-out links/nodes act as walls, not just invisible
       const s = l.source.id, t = l.target.id;
       if(frontier.includes(s) && !visited.has(t)){ visited.set(t, depth); next.push(t); }
       else if(frontier.includes(t) && !visited.has(s)){ visited.set(s, depth); next.push(s); }
@@ -470,7 +471,7 @@ function buildLegend(data){
     row.addEventListener("click", ()=>{
       toggleSetMember(hiddenNodeTypes, t.value);
       row.classList.toggle("legend-inactive");
-      applyFilters();
+      refreshSelectionVisibility();
     });
     legend.appendChild(row);
   });
@@ -479,7 +480,7 @@ function buildLegend(data){
   socialRow.addEventListener("click", ()=>{
     toggleSetMember(hiddenLinkKinds, "social");
     socialRow.classList.toggle("legend-inactive");
-    applyFilters();
+    refreshSelectionVisibility();
   });
   legend.appendChild(socialRow);
 
@@ -487,7 +488,7 @@ function buildLegend(data){
   boundaryRow.addEventListener("click", ()=>{
     toggleSetMember(hiddenLinkKinds, "boundary");
     boundaryRow.classList.toggle("legend-inactive");
-    applyFilters();
+    refreshSelectionVisibility();
   });
   legend.appendChild(boundaryRow);
 
@@ -504,7 +505,7 @@ function buildLegend(data){
       row.addEventListener("click", ()=>{
         toggleSetMember(hiddenParties, p);
         row.classList.toggle("legend-inactive");
-        applyFilters();
+        refreshSelectionVisibility();
       });
       sub.appendChild(row);
     });
@@ -539,10 +540,20 @@ function makeLegendRow(label, color, shape, inactive){
   return row;
 }
 
-function isNodeHidden(d){
+function isFilteredOut(d){
   if(hiddenNodeTypes.has(d.type)) return true;
   if(d.type === "party" && hiddenParties.has(d.name)) return true;
   if(d.type === "councillor" && hiddenParties.has(d.party)) return true;
+  return false;
+}
+function isLinkFilteredOut(l){
+  if(isFilteredOut(l.source) || isFilteredOut(l.target)) return true;
+  if(l.kind === "social" && hiddenLinkKinds.has("social")) return true;
+  if(l.kind === "boundary" && hiddenLinkKinds.has("boundary")) return true;
+  return false;
+}
+function isNodeHidden(d){
+  if(isFilteredOut(d)) return true;
   if(selectionActive && !activeSet.has(d.id)) return true;
   return false;
 }
