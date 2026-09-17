@@ -6,3 +6,5 @@ Id1,Id2,Relationship
 30,20,Parent/Child
 31,20,Parent/Child
 49,50,Married
+36,23,Son-In-Law/Mother-in-Law
+23,9,Parent/Child
