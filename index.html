@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Council Structure Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --paper:#EAEDEC;
+    --ink:#1B2430;
+    --ink-soft:#4A5568;
+    --line:#C7CDC9;
+    --panel:#F5F6F5;
+    --teal:#3E6259;
+    --ward:#8A8F85;
+    --parish:#6E7F5C;
+    --con:#0087DC;
+    --lab:#E4003B;
+    --ld:#FAA61A;
+    --grn:#6AB023;
+    --ref:#12B6CF;
+    --ind:#9C9FA6;
+    --other:#7C6A9C;
+    --social:#B23A6B;
+    --boundary:#5B7B8C;
+    --parishward:#B08B3D;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#171B1E; --ink:#E7EAE8; --ink-soft:#A7B0AC; --line:#333A38; --panel:#1F2427;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#171B1E; --ink:#E7EAE8; --ink-soft:#A7B0AC; --line:#333A38; --panel:#1F2427;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  header{padding:16px 24px 12px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;position:relative;}
+  header h1{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0;letter-spacing:0.2px;}
+  header p{margin:2px 0 0;font-size:13px;color:var(--ink-soft);}
+
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;}
+  .file-btn{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:6px 12px;font-size:13px;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;border-radius:2px;}
+  .file-btn:hover{background:var(--ink);color:var(--paper);}
+  #fileInput,#socialFileInput{display:none;}
+  .note{font-size:11px;color:var(--ink-soft);width:100%;margin-top:2px;}
+
+  .close-btn{position:absolute;top:10px;right:12px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
+  .close-btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+  .float-toggle{position:absolute;z-index:5;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:6px 12px;font-size:12px;border-radius:3px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;display:none;}
+  .float-toggle:hover{background:var(--ink);color:var(--paper);}
+  #reopenHeaderBtn{top:12px;left:12px;}
+  #reopenAsideBtn{top:12px;right:12px;}
+  #reopenDetailBtn{top:52px;right:12px;}
+
+  main{flex:1;display:flex;min-height:0;}
+  #graphWrap{flex:1;position:relative;min-width:0;}
+  svg{width:100%;height:100%;display:block;cursor:grab;}
+  svg:active{cursor:grabbing;}
+
+  aside{width:100%;flex:1;min-height:0;background:var(--panel);padding:18px;overflow-y:auto;font-size:13px;position:relative;}
+  #sidePanels{width:310px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column;}
+  #legendPane{border-bottom:1px solid var(--line);}
+  aside h2{font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin:0 0 4px;}
+  aside .legend-hint{font-size:11px;color:var(--ink-soft);margin:0 0 10px;}
+  .legend-row{display:flex;align-items:center;gap:8px;margin:5px 0;color:var(--ink-soft);cursor:pointer;padding:3px 4px;border-radius:3px;user-select:none;}
+  .legend-row:hover{background:var(--paper);}
+  .legend-row.legend-inactive{opacity:0.4;text-decoration:line-through;}
+  .legend-swatch{width:12px;height:12px;flex-shrink:0;}
+  .legend-sub{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+  .legend-sub-title{font-size:11px;color:var(--ink-soft);margin-bottom:2px;font-family:'IBM Plex Mono',monospace;}
+
+  .range-control{margin:4px 0 14px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .range-control label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:6px;}
+  .range-control input[type=range]{width:100%;accent-color:var(--teal);}
+
+  #detail{border-top:1px solid var(--line);margin-top:16px;padding-top:16px;}
+  #detail .empty{color:var(--ink-soft);line-height:1.5;}
+  #detail img.portrait{width:90px;height:135px;object-fit:cover;border-radius:3px;margin-bottom:10px;display:block;background:var(--line);}
+  #detail .name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin:0 0 2px;}
+  #detail .kind{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);text-transform:lowercase;margin:0 0 12px;}
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border:1px solid var(--line);border-radius:2px;margin:0 6px 6px 0;color:var(--ink-soft);}
+  .rel-group{margin-top:12px;}
+  .rel-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
+  .rel-item{padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer;}
+  .rel-item:hover{color:var(--teal);}
+
+  .node-label{font-size:11px;fill:var(--ink);pointer-events:none;font-family:'IBM Plex Sans',sans-serif;}
+  .link{stroke:var(--line);stroke-width:1.3px;}
+  .link.social{stroke:var(--social);stroke-width:1.5px;stroke-dasharray:4,3;}
+  .link.boundary{stroke:var(--boundary);stroke-width:2px;stroke-dasharray:1,3;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="close-btn" id="closeHeaderBtn" title="Hide controls">✕</button>
+    <div>
+      <h1>Council Structure Map</h1>
+      <p>Councillors, wards, parishes, parties and personal ties — how they connect.</p>
+    </div>
+    <div class="toolbar">
+      <button class="file-btn" id="loadBtn">Load people CSV</button>
+      <button class="file-btn" id="loadSocialBtn">Load relationships CSV</button>
+      <button class="file-btn" id="loadBoundaryBtn">Load ward–parish CSV</button>
+      <button class="file-btn" id="sampleBtn">Use sample data</button>
+      <input type="file" id="fileInput" accept=".csv">
+      <input type="file" id="socialFileInput" accept=".csv">
+      <input type="file" id="boundaryFileInput" accept=".csv">
+      <span class="note" id="statusNote">People CSV columns: Id, Name, Ward, CouncilPosition, Party, PartyPosition, Parish1–4, ImageUrl. Relationships CSV: Id1, Id2, Relationship. Ward–parish CSV: Ward, Parish, ParishWard (optional — a parish's own internal ward, which can sit in a different principal ward per row). On load, the page tries fetching People.csv, Wards.csv and Relationships.csv from its own folder automatically.</span>
+    </div>
+  </header>
+  <main>
+    <div id="graphWrap">
+      <svg></svg>
+      <button class="float-toggle" id="reopenHeaderBtn">Show controls</button>
+      <button class="float-toggle" id="reopenAsideBtn">Show legend</button>
+      <button class="float-toggle" id="reopenDetailBtn">Show info</button>
+    </div>
+    <div id="sidePanels">
+      <aside id="legendPane">
+        <button class="close-btn" id="closeAsideBtn" title="Hide legend">✕</button>
+        <h2>Legend</h2>
+        <p class="legend-hint">Click any item to filter it out of the diagram. Hollow rings are parish councillors with no local authority seat.</p>
+        <div class="range-control">
+          <label for="rangeSlider">Show connections within <span id="rangeValue">1</span> step(s) of the selected item</label>
+          <input type="range" id="rangeSlider" min="1" max="5" step="1" value="1">
+        </div>
+        <div id="legend"></div>
+      </aside>
+      <aside id="detailPane">
+        <button class="close-btn" id="closeDetailBtn" title="Hide info">✕</button>
+        <h2>Info</h2>
+        <div id="detail"><div class="empty">Click any person, ward, parish or party to see its connections and centre the diagram on it. Drag nodes to rearrange; scroll to zoom.</div></div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- Party colour map ----------
+const PARTY_COLORS = {
+  "conservative": "var(--con)", "conservative party": "var(--con)",
+  "labour": "var(--lab)", "labour party": "var(--lab)",
+  "liberal democrat": "var(--ld)", "liberal democrats": "var(--ld)", "lib dem": "var(--ld)",
+  "green": "var(--grn)", "green party": "var(--grn)",
+  "reform": "var(--ref)", "reform uk": "var(--ref)",
+  "independent": "var(--ind)", "independents": "var(--ind)"
+};
+function partyColor(name){
+  const key = (name||"").trim().toLowerCase();
+  if(!key) return "var(--ind)"; // no party listed — treat like unaffiliated
+  return PARTY_COLORS[key] || "var(--other)";
+}
+function resolveVar(v){
+  if(v.startsWith("var(")) return getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim() || "#7C6A9C";
+  return v;
+}
+function safeId(s){ return String(s).replace(/[^a-zA-Z0-9_-]/g,"_"); }
+
+// ---------- Sample dataset ----------
+const SAMPLE_CSV = `Id,Name,Ward,CouncilPosition,Party,PartyPosition,Parish1,Parish2,Parish3,Parish4,ImageUrl
+1,Alan Whitcombe,Meadowgate,Council Leader,Conservative,Group Leader,Meadowgate Parish,,,,
+2,Priya Shah,Meadowgate,,Conservative,,Meadowgate Parish,Oldbridge Parish,,,
+3,Robert Tanner,Northfield,Deputy Leader,Labour,Deputy Group Leader,Northfield Parish,,,,
+4,Denise Okafor,Northfield,,Labour,,Northfield Parish,,,,
+5,Margaret Ellison,Riverside,,Liberal Democrat,Group Leader,Riverside Parish,Southgate Parish,,,
+6,Colin Hargreaves,Riverside,,Independent,,Riverside Parish,,,,
+7,Susan Byrne,Southgate,Committee Chair,Green,Group Leader,Southgate Parish,,,,
+8,Frank Delaney,Southgate,,Conservative,,Southgate Parish,Oldbridge Parish,,,
+9,Helen Marsh,Oldbridge,,Labour,,Oldbridge Parish,Meadowgate Parish,,,
+10,Tom Ridgeway,Westcombe,Mayor,Conservative,,Westcombe Parish,Northfield Parish,,,
+11,Janet Pruitt,Westcombe,,Liberal Democrat,,Westcombe Parish,,,,
+12,Michael Osei,Ashfield,,Green,,Ashfield Parish,Riverside Parish,,,
+13,Karen Voss,Ashfield,,Reform UK,Group Leader,Ashfield Parish,,,,
+14,Barbara Quinn,,,Independent,,Meadowgate Parish,,,
+15,Nigel Foss,,,,,Southgate Parish,,,
+16,Diane Cho,,,Green,,Ashfield Parish,,,
+17,Oliver Bright,Northfield,,Labour,,,,,,
+18,Grace Sutton,Westcombe,,Conservative,,,,,,`;
+
+const SAMPLE_SOCIAL_CSV = `Id1,Id2,Relationship
+3,4,Married
+5,6,Partner
+10,11,Father/Daughter
+1,2,Business partner
+7,8,Sibling
+9,12,Business partner
+1,18,Parent/Child
+4,17,Parent/Child`;
+
+const SAMPLE_BOUNDARY_CSV = `Ward,Parish,ParishWard
+Meadowgate,Meadowgate Parish,
+Northfield,Northfield Parish,
+Riverside,Riverside Parish,
+Southgate,Southgate Parish,
+Southgate,Oldbridge Parish,Oldbridge East
+Oldbridge,Oldbridge Parish,Oldbridge West
+Westcombe,Westcombe Parish,
+Ashfield,Ashfield Parish,`;
+
+const DIRECTIONAL_RELATIONSHIPS = ["father/daughter","father/son","mother/daughter","mother/son","parent/child"];
+
+let peopleRows = [];
+let socialRows = [];
+let boundaryRows = [];
+let graphData = null;
+let linkSel, nodeSel, labelSel, simulation;
+
+// filter state, driven by the legend
+const hiddenNodeTypes = new Set();   // 'councillor' | 'ward' | 'parish' | 'party' | 'parishward'
+const hiddenLinkKinds = new Set();   // 'social' | 'boundary'
+const hiddenParties = new Set();     // specific party names
+
+// selection-range state, driven by the slider — controls which nodes disappear when something is selected
+let rangeSteps = 1;
+let currentSelected = null;
+let selectionActive = false;
+let activeSet = null; // Set of node ids within range of currentSelected
+
+function computeWithinRange(d, maxDepth){
+  const visited = new Map([[d.id, 0]]);
+  let frontier = [d.id];
+  for(let depth=1; depth<=maxDepth && frontier.length; depth++){
+    const next = [];
+    graphData.links.forEach(l=>{
+      const s = l.source.id, t = l.target.id;
+      if(frontier.includes(s) && !visited.has(t)){ visited.set(t, depth); next.push(t); }
+      else if(frontier.includes(t) && !visited.has(s)){ visited.set(s, depth); next.push(s); }
+    });
+    frontier = next;
+  }
+  return new Set(visited.keys());
+}
+
+function refreshSelectionVisibility(){
+  selectionActive = !!currentSelected;
+  activeSet = currentSelected ? computeWithinRange(currentSelected, rangeSteps) : null;
+  applyFilters();
+}
+
+const svg = d3.select("svg");
+const zoomLayer = svg.append("g");
+const zoomBehavior = d3.zoom().scaleExtent([0.3,3]).on("zoom", (e)=> zoomLayer.attr("transform", e.transform));
+svg.call(zoomBehavior);
+
+function ensureArrowMarker(){
+  if(!svg.select("defs.arrow-defs").empty()) return;
+  const defs = svg.append("defs").attr("class","arrow-defs");
+  defs.append("marker")
+    .attr("id","arrow-social")
+    .attr("viewBox","0 -5 10 10")
+    .attr("refX", 8).attr("refY", 0)
+    .attr("markerWidth", 7).attr("markerHeight", 7)
+    .attr("orient","auto")
+    .append("path").attr("d","M0,-5L10,0L0,5").attr("fill", resolveVar("var(--social)"));
+}
+
+// ---------- Build nodes/links from rows ----------
+function buildGraph(rows, socialRows, boundaryRows){
+  const nodes = new Map();
+  const links = [];
+  const parishCols = ["Parish1","Parish2","Parish3","Parish4"];
+  const idToNodeId = new Map(); // csv Id -> internal node id
+
+  function ensureNode(id, type, name, extra){
+    if(!nodes.has(id)) nodes.set(id, {id, type, name, ...extra});
+    return nodes.get(id);
+  }
+
+  rows.forEach(r=>{
+    const name = (r.Name||"").trim();
+    const rawId = (r.Id||"").trim();
+    if(!name || !rawId) return;
+    const cId = "councillor:"+rawId;
+    idToNodeId.set(rawId, cId);
+    ensureNode(cId, "councillor", name, {
+      recordId: rawId,
+      councilPosition: (r.CouncilPosition||"").trim(),
+      party: (r.Party||"").trim(),
+      partyPosition: (r.PartyPosition||"").trim(),
+      ward: (r.Ward||"").trim(),
+      imageUrl: (r.ImageUrl||"").trim()
+    });
+
+    const ward = (r.Ward||"").trim();
+    if(ward){
+      const wId = "ward:"+ward;
+      ensureNode(wId, "ward", ward, {});
+      links.push({source:cId, target:wId, kind:"ward"});
+    }
+
+    const party = (r.Party||"").trim();
+    if(party){
+      const pId = "party:"+party;
+      ensureNode(pId, "party", party, {});
+      links.push({source:cId, target:pId, kind:"party"});
+    }
+
+    parishCols.forEach(col=>{
+      const parish = (r[col]||"").trim();
+      if(parish){
+        const parId = "parish:"+parish;
+        ensureNode(parId, "parish", parish, {});
+        links.push({source:cId, target:parId, kind:"parish"});
+      }
+    });
+  });
+
+  const skippedSocial = [];
+  (socialRows||[]).forEach(r=>{
+    const id1 = (r.Id1||"").trim(), id2 = (r.Id2||"").trim(), rel = (r.Relationship||"").trim();
+    if(!id1 || !id2 || !rel) return;
+    const n1 = idToNodeId.get(id1), n2 = idToNodeId.get(id2);
+    if(!n1 || !n2){ skippedSocial.push(`${id1} — ${id2}`); return; }
+    const directional = DIRECTIONAL_RELATIONSHIPS.includes(rel.toLowerCase());
+    links.push({source:n1, target:n2, kind:"social", label:rel, directional});
+  });
+
+  (boundaryRows||[]).forEach(r=>{
+    const ward = (r.Ward||"").trim(), parish = (r.Parish||"").trim();
+    const parishWard = (r.ParishWard||"").trim();
+    if(!ward || !parish) return;
+    const wId = "ward:"+ward, parId = "parish:"+parish;
+    ensureNode(wId, "ward", ward, {});
+    ensureNode(parId, "parish", parish, {});
+    links.push({source:wId, target:parId, kind:"boundary"});
+
+    if(parishWard){
+      const pwId = "parishward:"+parish+"|"+parishWard;
+      ensureNode(pwId, "parishward", parishWard, {parentParish: parish});
+      links.push({source:pwId, target:parId, kind:"boundary"});
+      links.push({source:pwId, target:wId, kind:"boundary"});
+    }
+  });
+
+  return {nodes: Array.from(nodes.values()), links, skippedSocial};
+}
+
+function colorFor(d){
+  if(d.type === "councillor") return resolveVar(partyColor(d.party));
+  if(d.type === "ward") return resolveVar("var(--ward)");
+  if(d.type === "parish") return resolveVar("var(--parish)");
+  if(d.type === "parishward") return resolveVar("var(--parishward)");
+  if(d.type === "party") return resolveVar(partyColor(d.name));
+  return "#999";
+}
+function symbolFor(d){
+  const gen = d3.symbol().size(d.type === "party" ? 220 : 170);
+  if(d.type === "ward") gen.type(d3.symbolSquare);
+  else if(d.type === "parish") gen.type(d3.symbolTriangle);
+  else if(d.type === "parishward") gen.type(d3.symbolDiamond);
+  else gen.type(d3.symbolStar);
+  return gen();
+}
+
+// ---------- Render ----------
+function render(data){
+  graphData = data;
+  ensureArrowMarker();
+  zoomLayer.selectAll("g.nodes, g.links, g.labels").remove();
+
+  const width = svg.node().clientWidth, height = svg.node().clientHeight;
+
+  simulation = d3.forceSimulation(data.nodes)
+    .force("link", d3.forceLink(data.links).id(d=>d.id).distance(l=> l.kind==="party" ? 110 : l.kind==="social" ? 55 : l.kind==="boundary" ? 65 : 75).strength(0.7))
+    .force("charge", d3.forceManyBody().strength(-160))
+    .force("center", d3.forceCenter(width/2, height/2))
+    .force("collide", d3.forceCollide(22));
+
+  linkSel = zoomLayer.append("g").attr("class","links").selectAll("line")
+    .data(data.links).join("line")
+    .attr("class", d=>"link "+d.kind)
+    .attr("marker-end", d=> (d.kind==="social" && d.directional) ? "url(#arrow-social)" : null);
+  linkSel.append("title").text(d=> d.kind==="social" ? d.label : d.kind==="boundary" ? "Ward ↔ parish boundary" : "");
+
+  const nodeGroup = zoomLayer.append("g").attr("class","nodes");
+  nodeSel = nodeGroup.selectAll("g.node")
+    .data(data.nodes).join("g")
+    .attr("class","node")
+    .style("cursor","pointer")
+    .call(d3.drag()
+      .on("start", (e,d)=>{ if(!e.active) simulation.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+      .on("end", (e,d)=>{ if(!e.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; }))
+    .on("click", (e,d)=> selectNode(d));
+
+  const defs = svg.select("defs.arrow-defs");
+  nodeSel.each(function(d){
+    const g = d3.select(this);
+    if(d.type === "councillor"){
+      const r = 9;
+      const parishOnly = !d.ward;
+      if(d.imageUrl){
+        const clipId = "clip-"+safeId(d.id);
+        defs.append("clipPath").attr("id", clipId).append("circle").attr("r", r);
+        g.append("circle").attr("r", r).attr("fill", colorFor(d));
+        g.append("image")
+          .attr("clip-path", `url(#${clipId})`)
+          .attr("href", d.imageUrl)
+          .attr("x", -r).attr("y", -r).attr("width", r*2).attr("height", r*2)
+          .attr("preserveAspectRatio","xMidYMid slice")
+          .on("error", function(){ d3.select(this).remove(); });
+        g.append("circle").attr("r", r).attr("fill","none")
+          .attr("stroke", colorFor(d)).attr("stroke-width", 2)
+          .attr("stroke-dasharray", parishOnly ? "3,2" : null);
+      } else if(parishOnly){
+        g.append("circle").attr("r", r).attr("fill","var(--paper)")
+          .attr("stroke", colorFor(d)).attr("stroke-width", 2).attr("stroke-dasharray","3,2");
+      } else {
+        g.append("circle").attr("r", r).attr("fill", colorFor(d)).attr("stroke","var(--paper)").attr("stroke-width", 1.2);
+      }
+    } else {
+      g.append("path").attr("d", symbolFor(d)).attr("fill", colorFor(d)).attr("stroke","var(--paper)").attr("stroke-width", 1.2);
+    }
+  });
+
+  labelSel = zoomLayer.append("g").attr("class","labels").selectAll("text")
+    .data(data.nodes).join("text")
+    .attr("class","node-label")
+    .text(d=> d.name)
+    .attr("dx", 10).attr("dy", 4);
+
+  simulation.on("tick", ()=>{
+    linkSel.attr("x1", d=>d.source.x).attr("y1", d=>d.source.y).attr("x2", d=>d.target.x).attr("y2", d=>d.target.y);
+    nodeSel.attr("transform", d=>`translate(${d.x},${d.y})`);
+    labelSel.attr("x", d=>d.x).attr("y", d=>d.y);
+  });
+
+  buildLegend(data);
+  applyFilters();
+  clearSelection();
+}
+
+// ---------- Legend as filter ----------
+function toggleSetMember(set, value){ set.has(value) ? set.delete(value) : set.add(value); }
+
+function buildLegend(data){
+  const legend = document.getElementById("legend");
+  legend.innerHTML = "";
+
+  const typeRows = [
+    {label:"Councillor", value:"councillor", swatch:()=>resolveVar("var(--ink-soft)"), shape:"circle"},
+    {label:"Ward", value:"ward", swatch:()=>resolveVar("var(--ward)"), shape:"square"},
+    {label:"Parish", value:"parish", swatch:()=>resolveVar("var(--parish)"), shape:"triangle"},
+    {label:"Parish Ward", value:"parishward", swatch:()=>resolveVar("var(--parishward)"), shape:"diamond"},
+    {label:"Party", value:"party", swatch:()=>resolveVar("var(--other)"), shape:"square"}
+  ];
+  typeRows.forEach(t=>{
+    const row = makeLegendRow(t.label, t.swatch(), t.shape, hiddenNodeTypes.has(t.value));
+    row.addEventListener("click", ()=>{
+      toggleSetMember(hiddenNodeTypes, t.value);
+      row.classList.toggle("legend-inactive");
+      applyFilters();
+    });
+    legend.appendChild(row);
+  });
+
+  const socialRow = makeLegendRow("Social tie (dashed)", resolveVar("var(--social)"), "line", hiddenLinkKinds.has("social"));
+  socialRow.addEventListener("click", ()=>{
+    toggleSetMember(hiddenLinkKinds, "social");
+    socialRow.classList.toggle("legend-inactive");
+    applyFilters();
+  });
+  legend.appendChild(socialRow);
+
+  const boundaryRow = makeLegendRow("Ward ↔ parish boundary", resolveVar("var(--boundary)"), "line", hiddenLinkKinds.has("boundary"));
+  boundaryRow.addEventListener("click", ()=>{
+    toggleSetMember(hiddenLinkKinds, "boundary");
+    boundaryRow.classList.toggle("legend-inactive");
+    applyFilters();
+  });
+  legend.appendChild(boundaryRow);
+
+  const parties = [...new Set(data.nodes.filter(n=>n.type==="party").map(n=>n.name))];
+  if(parties.length){
+    const sub = document.createElement("div");
+    sub.className = "legend-sub";
+    const title = document.createElement("div");
+    title.className = "legend-sub-title";
+    title.textContent = "By party";
+    sub.appendChild(title);
+    parties.forEach(p=>{
+      const row = makeLegendRow(p, resolveVar(partyColor(p)), "circle", hiddenParties.has(p));
+      row.addEventListener("click", ()=>{
+        toggleSetMember(hiddenParties, p);
+        row.classList.toggle("legend-inactive");
+        applyFilters();
+      });
+      sub.appendChild(row);
+    });
+    legend.appendChild(sub);
+  }
+}
+
+function makeLegendRow(label, color, shape, inactive){
+  const row = document.createElement("div");
+  row.className = "legend-row" + (inactive ? " legend-inactive" : "");
+  const sw = document.createElement("span");
+  sw.className = "legend-swatch";
+  if(shape === "line"){
+    sw.style.background = "none";
+    sw.style.borderTop = `2px dashed ${color}`;
+    sw.style.height = "0";
+    sw.style.marginTop = "6px";
+  } else if(shape === "diamond"){
+    sw.style.background = color;
+    sw.style.transform = "rotate(45deg)";
+    sw.style.width = "9px";
+    sw.style.height = "9px";
+    sw.style.margin = "0 3px";
+  } else {
+    sw.style.background = color;
+    sw.style.borderRadius = shape === "circle" ? "50%" : shape === "triangle" ? "0" : "2px";
+  }
+  row.appendChild(sw);
+  const txt = document.createElement("span");
+  txt.textContent = label;
+  row.appendChild(txt);
+  return row;
+}
+
+function isNodeHidden(d){
+  if(hiddenNodeTypes.has(d.type)) return true;
+  if(d.type === "party" && hiddenParties.has(d.name)) return true;
+  if(d.type === "councillor" && hiddenParties.has(d.party)) return true;
+  if(selectionActive && !activeSet.has(d.id)) return true;
+  return false;
+}
+function isLinkHidden(l){
+  if(isNodeHidden(l.source) || isNodeHidden(l.target)) return true;
+  if(l.kind === "social" && hiddenLinkKinds.has("social")) return true;
+  if(l.kind === "boundary" && hiddenLinkKinds.has("boundary")) return true;
+  return false;
+}
+function applyFilters(){
+  if(!nodeSel) return;
+  nodeSel.style("display", d=> isNodeHidden(d) ? "none" : null);
+  labelSel.style("display", d=> isNodeHidden(d) ? "none" : null);
+  linkSel.style("display", l=> isLinkHidden(l) ? "none" : null);
+}
+
+// ---------- Selection, centering, detail panel ----------
+function neighborsOf(d, data){
+  const connected = new Set([d.id]);
+  const relLinks = data.links.filter(l=> l.source.id===d.id || l.target.id===d.id);
+  relLinks.forEach(l=>{ connected.add(l.source.id); connected.add(l.target.id); });
+  return {connected, relLinks};
+}
+
+function centerOn(d){
+  const width = svg.node().clientWidth, height = svg.node().clientHeight;
+  const current = d3.zoomTransform(svg.node());
+  const k = current.k;
+  const tx = width/2 - d.x*k;
+  const ty = height/2 - d.y*k;
+  svg.transition().duration(650).call(zoomBehavior.transform, d3.zoomIdentity.translate(tx,ty).scale(k));
+}
+
+function selectNode(d){
+  currentSelected = d;
+  refreshSelectionVisibility();
+  centerOn(d);
+
+  const {relLinks} = neighborsOf(d, graphData);
+
+  const panel = document.getElementById("detail");
+  const rels = {};
+  relLinks.forEach(l=>{
+    const other = l.source.id===d.id ? l.target : l.source;
+    rels[l.kind] = rels[l.kind] || [];
+    rels[l.kind].push(other);
+  });
+
+  let badges = "";
+  if(d.type==="councillor"){
+    if(!d.ward) badges += `<span class="badge">Parish council only — no authority seat</span>`;
+    if(d.councilPosition) badges += `<span class="badge">${d.councilPosition}</span>`;
+    if(d.partyPosition) badges += `<span class="badge">${d.partyPosition}</span>`;
+  }
+
+  let img = "";
+  if(d.type==="councillor" && d.imageUrl){
+    img = `<img class="portrait" src="${d.imageUrl}" onerror="this.remove()">`;
+  }
+
+  let relHtml = "";
+  const kindLabel = {ward:"Ward", parish:"Parishes / boroughs", party:"Party", social:"Social connections", boundary:"Boundary (ward ↔ parish)"};
+  Object.keys(rels).forEach(k=>{
+    if(k === "social"){
+      relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]}</div>` +
+        relLinks.filter(l=>l.kind==="social").map(l=>{
+          const other = l.source.id===d.id ? l.target : l.source;
+          let label = l.label;
+          if(l.directional && l.label.includes("/")){
+            const parts = l.label.split("/");
+            label = (l.source.id===d.id) ? parts[1] : parts[0];
+          }
+          return `<div class="rel-item" data-id="${other.id}">${other.name} — <em style="color:var(--ink-soft);font-style:normal;">${label}</em></div>`;
+        }).join("") + `</div>`;
+      return;
+    }
+    relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]||k}</div>` +
+      rels[k].map(n=>`<div class="rel-item" data-id="${n.id}">${n.name}</div>`).join("") + `</div>`;
+  });
+  if(d.type !== "councillor"){
+    const members = relLinks.map(l=> l.source.id===d.id ? l.target : l.source).filter(n=>n.type==="councillor");
+    if(members.length){
+      relHtml = `<div class="rel-group"><div class="rel-label">Councillors</div>` +
+        members.map(n=>`<div class="rel-item" data-id="${n.id}">${n.name}</div>`).join("") + `</div>` + relHtml;
+    }
+  }
+
+  panel.innerHTML = `${img}<p class="name">${d.name}</p><p class="kind">${d.type==="councillor" && !d.ward ? "parish councillor" : d.type}</p>${badges}${relHtml}`;
+  panel.querySelectorAll(".rel-item").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const target = graphData.nodes.find(n=>n.id===el.dataset.id);
+      if(target) selectNode(target);
+    });
+  });
+}
+
+function clearSelection(){
+  currentSelected = null;
+  refreshSelectionVisibility();
+  document.getElementById("detail").innerHTML =
+    `<div class="empty">Click any person, ward, parish or party to see its connections and centre the diagram on it. Drag nodes to rearrange; scroll to zoom.</div>`;
+}
+svg.on("click", (e)=>{ if(e.target.tagName === "svg") clearSelection(); });
+
+// ---------- CSV loading ----------
+function rebuild(){
+  const data = buildGraph(peopleRows, socialRows, boundaryRows);
+  render(data);
+  if(data.skippedSocial && data.skippedSocial.length){
+    console.warn("Skipped social links (Id not found among people rows):", data.skippedSocial);
+  }
+}
+function loadPeopleText(text){ peopleRows = Papa.parse(text, {header:true, skipEmptyLines:true}).data; rebuild(); }
+function loadSocialText(text){ socialRows = Papa.parse(text, {header:true, skipEmptyLines:true}).data; rebuild(); }
+function loadBoundaryText(text){ boundaryRows = Papa.parse(text, {header:true, skipEmptyLines:true}).data; rebuild(); }
+
+document.getElementById("loadBtn").addEventListener("click", ()=> document.getElementById("fileInput").click());
+document.getElementById("fileInput").addEventListener("change", (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> loadPeopleText(reader.result);
+  reader.readAsText(file);
+});
+document.getElementById("loadSocialBtn").addEventListener("click", ()=> document.getElementById("socialFileInput").click());
+document.getElementById("socialFileInput").addEventListener("change", (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> loadSocialText(reader.result);
+  reader.readAsText(file);
+});
+document.getElementById("loadBoundaryBtn").addEventListener("click", ()=> document.getElementById("boundaryFileInput").click());
+document.getElementById("boundaryFileInput").addEventListener("change", (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> loadBoundaryText(reader.result);
+  reader.readAsText(file);
+});
+document.getElementById("sampleBtn").addEventListener("click", ()=>{
+  loadPeopleText(SAMPLE_CSV);
+  loadSocialText(SAMPLE_SOCIAL_CSV);
+  loadBoundaryText(SAMPLE_BOUNDARY_CSV);
+});
+
+const legendPaneEl = document.getElementById("legendPane");
+const detailPaneEl = document.getElementById("detailPane");
+const headerEl = document.querySelector("header");
+const reopenHeaderBtn = document.getElementById("reopenHeaderBtn");
+const reopenAsideBtn = document.getElementById("reopenAsideBtn");
+const reopenDetailBtn = document.getElementById("reopenDetailBtn");
+
+document.getElementById("closeHeaderBtn").addEventListener("click", ()=>{
+  headerEl.style.display = "none";
+  reopenHeaderBtn.style.display = "block";
+  window.dispatchEvent(new Event("resize"));
+});
+reopenHeaderBtn.addEventListener("click", ()=>{
+  headerEl.style.display = "";
+  reopenHeaderBtn.style.display = "none";
+  window.dispatchEvent(new Event("resize"));
+});
+
+document.getElementById("closeAsideBtn").addEventListener("click", ()=>{
+  legendPaneEl.style.display = "none";
+  reopenAsideBtn.style.display = "block";
+  updateSidePanelsVisibility();
+  window.dispatchEvent(new Event("resize"));
+});
+reopenAsideBtn.addEventListener("click", ()=>{
+  legendPaneEl.style.display = "";
+  reopenAsideBtn.style.display = "none";
+  updateSidePanelsVisibility();
+  window.dispatchEvent(new Event("resize"));
+});
+
+document.getElementById("closeDetailBtn").addEventListener("click", ()=>{
+  detailPaneEl.style.display = "none";
+  reopenDetailBtn.style.display = "block";
+  updateSidePanelsVisibility();
+  window.dispatchEvent(new Event("resize"));
+});
+reopenDetailBtn.addEventListener("click", ()=>{
+  detailPaneEl.style.display = "";
+  reopenDetailBtn.style.display = "none";
+  updateSidePanelsVisibility();
+  window.dispatchEvent(new Event("resize"));
+});
+
+function updateSidePanelsVisibility(){
+  const sidePanelsEl = document.getElementById("sidePanels");
+  const bothHidden = legendPaneEl.style.display === "none" && detailPaneEl.style.display === "none";
+  sidePanelsEl.style.display = bothHidden ? "none" : "flex";
+}
+
+const rangeSlider = document.getElementById("rangeSlider");
+const rangeValueEl = document.getElementById("rangeValue");
+rangeSlider.addEventListener("input", ()=>{
+  rangeSteps = parseInt(rangeSlider.value, 10);
+  rangeValueEl.textContent = rangeSteps;
+  if(currentSelected) refreshSelectionVisibility();
+});
+
+async function tryFetchCsv(filename){
+  try{
+    const res = await fetch(filename, {cache:"no-store"});
+    if(!res.ok) return null;
+    const text = await res.text();
+    return Papa.parse(text, {header:true, skipEmptyLines:true}).data;
+  } catch(e){
+    return null; // most likely blocked by the browser's file:// CORS policy — see the note in the reply
+  }
+}
+
+async function autoLoadOrSample(){
+  const statusNote = document.getElementById("statusNote");
+  const defaultNoteText = statusNote.textContent;
+
+  const [people, wards, rels] = await Promise.all([
+    tryFetchCsv("People.csv"),
+    tryFetchCsv("Wards.csv"),
+    tryFetchCsv("Relationships.csv")
+  ]);
+  const foundAny = people || wards || rels;
+
+  if(foundAny){
+    peopleRows = people || [];
+    boundaryRows = wards || [];
+    socialRows = rels || [];
+    const parts = [
+      people ? "People.csv ✓" : "People.csv not found",
+      wards ? "Wards.csv ✓" : "Wards.csv not found",
+      rels ? "Relationships.csv ✓" : "Relationships.csv not found"
+    ];
+    statusNote.textContent = "Auto-loaded from folder — " + parts.join(", ") + ". " + defaultNoteText;
+  } else {
+    peopleRows = Papa.parse(SAMPLE_CSV, {header:true, skipEmptyLines:true}).data;
+    boundaryRows = Papa.parse(SAMPLE_BOUNDARY_CSV, {header:true, skipEmptyLines:true}).data;
+    socialRows = Papa.parse(SAMPLE_SOCIAL_CSV, {header:true, skipEmptyLines:true}).data;
+    statusNote.textContent = "No People.csv / Wards.csv / Relationships.csv found next to this file — showing sample data. " + defaultNoteText;
+  }
+  rebuild();
+}
+autoLoadOrSample();
+
+window.addEventListener("resize", ()=>{ if(graphData) render(graphData); });
+</script>
+</body>
+</html>
