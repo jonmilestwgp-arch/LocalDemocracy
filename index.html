@@ -115,7 +115,7 @@
       <input type="file" id="fileInput" accept=".csv">
       <input type="file" id="socialFileInput" accept=".csv">
       <input type="file" id="boundaryFileInput" accept=".csv">
-      <span class="note" id="statusNote">People CSV columns: Id, Name, Ward, CouncilPosition, Party, PartyPosition, Parish1–4, ImageUrl. Relationships CSV: Id1, Id2, Relationship. Ward–parish CSV: Ward, Parish, ParishWard (optional — a parish's own internal ward, which can sit in a different principal ward per row). On load, the page tries fetching People.csv, Wards.csv and Relationships.csv from its own folder automatically.</span>
+      <span class="note" id="statusNote">People CSV columns: Id, Name, Ward, CouncilPosition, Party, PartyPosition, then for each of 4 parishes: ParishN, ParishPositionN, ParishWardN, then ImageUrl. Relationships CSV: Id1, Id2, Relationship. Ward–parish CSV: Ward, Parish, ParishWard (optional). On load, the page tries fetching People.csv, Wards.csv and Relationships.csv from its own folder automatically.</span>
     </div>
   </header>
   <main>
@@ -167,25 +167,25 @@ function resolveVar(v){
 function safeId(s){ return String(s).replace(/[^a-zA-Z0-9_-]/g,"_"); }
 
 // ---------- Sample dataset ----------
-const SAMPLE_CSV = `Id,Name,Ward,CouncilPosition,Party,PartyPosition,Parish1,Parish2,Parish3,Parish4,ImageUrl
-1,Alan Whitcombe,Meadowgate,Council Leader,Conservative,Group Leader,Meadowgate Parish,,,,
-2,Priya Shah,Meadowgate,,Conservative,,Meadowgate Parish,Oldbridge Parish,,,
-3,Robert Tanner,Northfield,Deputy Leader,Labour,Deputy Group Leader,Northfield Parish,,,,
-4,Denise Okafor,Northfield,,Labour,,Northfield Parish,,,,
-5,Margaret Ellison,Riverside,,Liberal Democrat,Group Leader,Riverside Parish,Southgate Parish,,,
-6,Colin Hargreaves,Riverside,,Independent,,Riverside Parish,,,,
-7,Susan Byrne,Southgate,Committee Chair,Green,Group Leader,Southgate Parish,,,,
-8,Frank Delaney,Southgate,,Conservative,,Southgate Parish,Oldbridge Parish,,,
-9,Helen Marsh,Oldbridge,,Labour,,Oldbridge Parish,Meadowgate Parish,,,
-10,Tom Ridgeway,Westcombe,Mayor,Conservative,,Westcombe Parish,Northfield Parish,,,
-11,Janet Pruitt,Westcombe,,Liberal Democrat,,Westcombe Parish,,,,
-12,Michael Osei,Ashfield,,Green,,Ashfield Parish,Riverside Parish,,,
-13,Karen Voss,Ashfield,,Reform UK,Group Leader,Ashfield Parish,,,,
-14,Barbara Quinn,,,Independent,,Meadowgate Parish,,,
-15,Nigel Foss,,,,,Southgate Parish,,,
-16,Diane Cho,,,Green,,Ashfield Parish,,,
-17,Oliver Bright,Northfield,,Labour,,,,,,
-18,Grace Sutton,Westcombe,,Conservative,,,,,,`;
+const SAMPLE_CSV = `Id,Name,Ward,CouncilPosition,Party,PartyPosition,Parish1,ParishPosition1,ParishWard1,Parish2,ParishPosition2,ParishWard2,Parish3,ParishPosition3,ParishWard3,Parish4,ParishPosition4,ParishWard4,ImageUrl
+1,Alan Whitcombe,Meadowgate,Council Leader,Conservative,Group Leader,Meadowgate Parish,Chair,,,,,,,,,,,
+2,Priya Shah,Meadowgate,,Conservative,,Meadowgate Parish,,,Oldbridge Parish,,Oldbridge West,,,,,,,
+3,Robert Tanner,Northfield,Deputy Leader,Labour,Deputy Group Leader,Northfield Parish,,,,,,,,,,,,
+4,Denise Okafor,Northfield,,Labour,,Northfield Parish,,,,,,,,,,,,
+5,Margaret Ellison,Riverside,,Liberal Democrat,Group Leader,Riverside Parish,,,Southgate Parish,,,,,,,,,
+6,Colin Hargreaves,Riverside,,Independent,,Riverside Parish,,,,,,,,,,,,
+7,Susan Byrne,Southgate,Committee Chair,Green,Group Leader,Southgate Parish,,,,,,,,,,,,
+8,Frank Delaney,Southgate,,Conservative,,Southgate Parish,,,Oldbridge Parish,,Oldbridge East,,,,,,,
+9,Helen Marsh,Oldbridge,,Labour,,Oldbridge Parish,Vice Chair,Oldbridge East,Meadowgate Parish,,,,,,,,,
+10,Tom Ridgeway,Westcombe,Mayor,Conservative,,Westcombe Parish,,,Northfield Parish,,,,,,,,,
+11,Janet Pruitt,Westcombe,,Liberal Democrat,,Westcombe Parish,,,,,,,,,,,,
+12,Michael Osei,Ashfield,,Green,,Ashfield Parish,,,Riverside Parish,,,,,,,,,
+13,Karen Voss,Ashfield,,Reform UK,Group Leader,Ashfield Parish,,,,,,,,,,,,
+14,Barbara Quinn,,,Independent,,Meadowgate Parish,Chair,,,,,,,,,,,
+15,Nigel Foss,,,,,Southgate Parish,,,,,,,,,,,,
+16,Diane Cho,,,Green,,Ashfield Parish,,,,,,,,,,,,
+17,Oliver Bright,Northfield,,Labour,,,,,,,,,,,,,,
+18,Grace Sutton,Westcombe,,Conservative,,,,,,,,,,,,,,`;
 
 const SAMPLE_SOCIAL_CSV = `Id1,Id2,Relationship
 3,4,Married
@@ -268,7 +268,6 @@ function ensureArrowMarker(){
 function buildGraph(rows, socialRows, boundaryRows){
   const nodes = new Map();
   const links = [];
-  const parishCols = ["Parish1","Parish2","Parish3","Parish4"];
   const idToNodeId = new Map(); // csv Id -> internal node id
 
   function ensureNode(id, type, name, extra){
@@ -305,14 +304,21 @@ function buildGraph(rows, socialRows, boundaryRows){
       links.push({source:cId, target:pId, kind:"party"});
     }
 
-    parishCols.forEach(col=>{
-      const parish = (r[col]||"").trim();
+    for(let i=1;i<=4;i++){
+      const parish = (r["Parish"+i]||"").trim();
+      const position = (r["ParishPosition"+i]||"").trim();
+      const parishWardName = (r["ParishWard"+i]||"").trim();
       if(parish){
         const parId = "parish:"+parish;
         ensureNode(parId, "parish", parish, {});
-        links.push({source:cId, target:parId, kind:"parish"});
+        links.push({source:cId, target:parId, kind:"parish", position});
       }
-    });
+      if(parishWardName && parish){
+        const pwId = "parishward:"+parish+"|"+parishWardName;
+        ensureNode(pwId, "parishward", parishWardName, {parentParish: parish});
+        links.push({source:cId, target:pwId, kind:"parishward"});
+      }
+    }
   });
 
   const skippedSocial = [];
@@ -380,7 +386,12 @@ function render(data){
     .data(data.links).join("line")
     .attr("class", d=>"link "+d.kind)
     .attr("marker-end", d=> (d.kind==="social" && d.directional) ? "url(#arrow-social)" : null);
-  linkSel.append("title").text(d=> d.kind==="social" ? d.label : d.kind==="boundary" ? "Ward ↔ parish boundary" : "");
+  linkSel.append("title").text(d=>
+    d.kind==="social" ? d.label
+    : d.kind==="boundary" ? "Ward ↔ parish boundary"
+    : d.kind==="parish" && d.position ? d.position
+    : d.kind==="parishward" ? "Parish ward seat"
+    : "");
 
   const nodeGroup = zoomLayer.append("g").attr("class","nodes");
   nodeSel = nodeGroup.selectAll("g.node")
@@ -593,7 +604,7 @@ function selectNode(d){
   }
 
   let relHtml = "";
-  const kindLabel = {ward:"Ward", parish:"Parishes / boroughs", party:"Party", social:"Social connections", boundary:"Boundary (ward ↔ parish)"};
+  const kindLabel = {ward:"Ward", parish:"Parishes / boroughs", party:"Party", social:"Social connections", boundary:"Boundary (ward ↔ parish)", parishward:"Parish ward seat"};
   Object.keys(rels).forEach(k=>{
     if(k === "social"){
       relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]}</div>` +
@@ -605,6 +616,15 @@ function selectNode(d){
             label = (l.source.id===d.id) ? parts[1] : parts[0];
           }
           return `<div class="rel-item" data-id="${other.id}">${other.name} — <em style="color:var(--ink-soft);font-style:normal;">${label}</em></div>`;
+        }).join("") + `</div>`;
+      return;
+    }
+    if(k === "parish"){
+      relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]}</div>` +
+        relLinks.filter(l=>l.kind==="parish").map(l=>{
+          const other = l.source.id===d.id ? l.target : l.source;
+          const posTxt = l.position ? ` — <em style="color:var(--ink-soft);font-style:normal;">${l.position}</em>` : "";
+          return `<div class="rel-item" data-id="${other.id}">${other.name}${posTxt}</div>`;
         }).join("") + `</div>`;
       return;
     }
