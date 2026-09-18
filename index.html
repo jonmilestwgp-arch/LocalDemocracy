@@ -63,8 +63,8 @@
 
   main{flex:1;display:flex;min-height:0;}
   #graphWrap{flex:1;position:relative;min-width:0;}
-  svg{width:100%;height:100%;display:block;cursor:grab;}
-  svg:active{cursor:grabbing;}
+  #graphSvg{width:100%;height:100%;display:block;cursor:grab;}
+  #graphSvg:active{cursor:grabbing;}
 
   aside{width:100%;flex:1;min-height:0;background:var(--panel);padding:18px;overflow-y:auto;font-size:13px;position:relative;}
   #sidePanels{width:310px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column;}
@@ -120,7 +120,7 @@
   </header>
   <main>
     <div id="graphWrap">
-      <svg></svg>
+      <svg id="graphSvg"></svg>
       <button class="float-toggle" id="reopenHeaderBtn">Show controls</button>
       <button class="float-toggle" id="reopenAsideBtn">Show legend</button>
       <button class="float-toggle" id="reopenDetailBtn">Show info</button>
@@ -165,6 +165,10 @@ function resolveVar(v){
   return v;
 }
 function safeId(s){ return String(s).replace(/[^a-zA-Z0-9_-]/g,"_"); }
+function typeLabel(type){
+  const map = {parishcouncillor:"parish councillor", parishward:"parish ward"};
+  return map[type] || type;
+}
 
 // ---------- Sample dataset ----------
 const SAMPLE_CSV = `Id,Name,Ward,CouncilPosition,Party,PartyPosition,Parish1,ParishPosition1,ParishWard1,Parish2,ParishPosition2,ParishWard2,Parish3,ParishPosition3,ParishWard3,Parish4,ParishPosition4,ParishWard4,ImageUrl
@@ -224,9 +228,10 @@ const hiddenParties = new Set();     // specific party names
 let rangeSteps = 1;
 let currentSelected = null;
 let selectionActive = false;
-let activeSet = null; // Set of node ids within range of currentSelected
+let activeSet = null;     // Set of node ids within range of currentSelected
+let activeDepths = null;  // Map of node id -> hop distance from currentSelected
 
-function computeWithinRange(d, maxDepth){
+function computeDepths(d, maxDepth){
   const visited = new Map([[d.id, 0]]);
   let frontier = [d.id];
   for(let depth=1; depth<=maxDepth && frontier.length; depth++){
@@ -239,16 +244,36 @@ function computeWithinRange(d, maxDepth){
     });
     frontier = next;
   }
-  return new Set(visited.keys());
+  return visited;
+}
+
+// Distance of a link from the selected node = the deeper of its two ends (1 = touches the
+// selected node directly). Returns null if either end isn't within range.
+function linkDistanceFromSelection(l){
+  if(!activeDepths) return null;
+  const ds = activeDepths.get(l.source.id), dt = activeDepths.get(l.target.id);
+  if(ds === undefined || dt === undefined) return null;
+  return Math.max(ds, dt);
+}
+
+let distColorScale = null;
+function colorForDistance(dist, maxDist){
+  if(!distColorScale){
+    distColorScale = d3.interpolateRgb(resolveVar("var(--ink)"), resolveVar("var(--line)"));
+  }
+  const denom = Math.max(maxDist - 1, 1);
+  const t = Math.min(Math.max((dist - 1) / denom, 0), 1);
+  return distColorScale(t);
 }
 
 function refreshSelectionVisibility(){
   selectionActive = !!currentSelected;
-  activeSet = currentSelected ? computeWithinRange(currentSelected, rangeSteps) : null;
+  activeDepths = currentSelected ? computeDepths(currentSelected, rangeSteps) : null;
+  activeSet = activeDepths ? new Set(activeDepths.keys()) : null;
   applyFilters();
 }
 
-const svg = d3.select("svg");
+const svg = d3.select("#graphSvg");
 const zoomLayer = svg.append("g");
 const zoomBehavior = d3.zoom().scaleExtent([0.3,3]).on("zoom", (e)=> zoomLayer.attr("transform", e.transform));
 svg.call(zoomBehavior);
@@ -281,17 +306,18 @@ function buildGraph(rows, socialRows, boundaryRows){
     const rawId = (r.Id||"").trim();
     if(!name || !rawId) return;
     const cId = "councillor:"+rawId;
+    const ward = (r.Ward||"").trim();
+    const nodeType = ward ? "councillor" : "parishcouncillor";
     idToNodeId.set(rawId, cId);
-    ensureNode(cId, "councillor", name, {
+    ensureNode(cId, nodeType, name, {
       recordId: rawId,
       councilPosition: (r.CouncilPosition||"").trim(),
       party: (r.Party||"").trim(),
       partyPosition: (r.PartyPosition||"").trim(),
-      ward: (r.Ward||"").trim(),
+      ward: ward,
       imageUrl: (r.ImageUrl||"").trim()
     });
 
-    const ward = (r.Ward||"").trim();
     if(ward){
       const wId = "ward:"+ward;
       ensureNode(wId, "ward", ward, {});
@@ -353,7 +379,7 @@ function buildGraph(rows, socialRows, boundaryRows){
 }
 
 function colorFor(d){
-  if(d.type === "councillor") return resolveVar(partyColor(d.party));
+  if(d.type === "councillor" || d.type === "parishcouncillor") return resolveVar(partyColor(d.party));
   if(d.type === "ward") return resolveVar("var(--ward)");
   if(d.type === "parish") return resolveVar("var(--parish)");
   if(d.type === "parishward") return resolveVar("var(--parishward)");
@@ -408,9 +434,9 @@ function render(data){
   const defs = svg.select("defs.arrow-defs");
   nodeSel.each(function(d){
     const g = d3.select(this);
-    if(d.type === "councillor"){
+    if(d.type === "councillor" || d.type === "parishcouncillor"){
       const r = 9;
-      const parishOnly = !d.ward;
+      const parishOnly = d.type === "parishcouncillor";
       if(d.imageUrl){
         const clipId = "clip-"+safeId(d.id);
         defs.append("clipPath").attr("id", clipId).append("circle").attr("r", r);
@@ -460,14 +486,18 @@ function buildLegend(data){
   legend.innerHTML = "";
 
   const typeRows = [
-    {label:"Councillor", value:"councillor", swatch:()=>resolveVar("var(--ink-soft)"), shape:"circle"},
-    {label:"Ward", value:"ward", swatch:()=>resolveVar("var(--ward)"), shape:"square"},
-    {label:"Parish", value:"parish", swatch:()=>resolveVar("var(--parish)"), shape:"triangle"},
-    {label:"Parish Ward", value:"parishward", swatch:()=>resolveVar("var(--parishward)"), shape:"diamond"},
-    {label:"Party", value:"party", swatch:()=>resolveVar("var(--other)"), shape:"square"}
+    {label:"Councillor", value:"councillor", hollow:false},
+    {label:"Parish Councillor", value:"parishcouncillor", hollow:true},
+    {label:"Ward", value:"ward", hollow:false},
+    {label:"Parish", value:"parish", hollow:false},
+    {label:"Parish Ward", value:"parishward", hollow:false},
+    {label:"Party", value:"party", hollow:false}
   ];
   typeRows.forEach(t=>{
-    const row = makeLegendRow(t.label, t.swatch(), t.shape, hiddenNodeTypes.has(t.value));
+    const isPerson = t.value === "councillor" || t.value === "parishcouncillor";
+    const color = isPerson ? resolveVar("var(--ink-soft)") : colorFor({type:t.value, name:"__generic"});
+    const shapeKind = isPerson ? "circle" : t.value;
+    const row = makeLegendRow(t.label, color, shapeKind, hiddenNodeTypes.has(t.value), t.hollow);
     row.addEventListener("click", ()=>{
       toggleSetMember(hiddenNodeTypes, t.value);
       row.classList.toggle("legend-inactive");
@@ -501,7 +531,7 @@ function buildLegend(data){
     title.textContent = "By party";
     sub.appendChild(title);
     parties.forEach(p=>{
-      const row = makeLegendRow(p, resolveVar(partyColor(p)), "circle", hiddenParties.has(p));
+      const row = makeLegendRow(p, resolveVar(partyColor(p)), "circle", hiddenParties.has(p), false);
       row.addEventListener("click", ()=>{
         toggleSetMember(hiddenParties, p);
         row.classList.toggle("legend-inactive");
@@ -513,27 +543,45 @@ function buildLegend(data){
   }
 }
 
-function makeLegendRow(label, color, shape, inactive){
+// Builds the legend icon using the same SHAPE as the graph nodes (so they can't drift out of
+// sync), but at a small fixed icon size with breathing room — the graph's own symbol sizes
+// are far too large here, and filling the box edge-to-edge reads as oversized even when small.
+const LEGEND_SYMBOL_TYPES = {ward: d3.symbolSquare, parish: d3.symbolTriangle, parishward: d3.symbolDiamond, party: d3.symbolStar};
+function makeShapeSwatch(kind, color, hollow){
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svgEl = document.createElementNS(svgNS, "svg");
+  svgEl.setAttribute("width", "18");
+  svgEl.setAttribute("height", "18");
+  svgEl.setAttribute("viewBox", "-9 -9 18 18");
+  svgEl.style.flexShrink = "0";
+  svgEl.style.display = "block";
+  const pathEl = document.createElementNS(svgNS, "path");
+  const symbolType = kind === "circle" ? d3.symbolCircle : (LEGEND_SYMBOL_TYPES[kind] || d3.symbolCircle);
+  const size = kind === "party" ? 24 : kind === "circle" ? 14 : 18;
+  const d = d3.symbol().type(symbolType).size(size)();
+  pathEl.setAttribute("d", d);
+  pathEl.setAttribute("fill", hollow ? "none" : color);
+  pathEl.setAttribute("stroke", color);
+  pathEl.setAttribute("stroke-width", hollow ? "1.4" : "1");
+  svgEl.appendChild(pathEl);
+  return svgEl;
+}
+
+function makeLegendRow(label, color, shapeKind, inactive, hollow){
   const row = document.createElement("div");
   row.className = "legend-row" + (inactive ? " legend-inactive" : "");
-  const sw = document.createElement("span");
-  sw.className = "legend-swatch";
-  if(shape === "line"){
+  if(shapeKind === "line"){
+    const sw = document.createElement("span");
+    sw.className = "legend-swatch";
     sw.style.background = "none";
     sw.style.borderTop = `2px dashed ${color}`;
     sw.style.height = "0";
     sw.style.marginTop = "6px";
-  } else if(shape === "diamond"){
-    sw.style.background = color;
-    sw.style.transform = "rotate(45deg)";
-    sw.style.width = "9px";
-    sw.style.height = "9px";
-    sw.style.margin = "0 3px";
+    sw.style.width = "16px";
+    row.appendChild(sw);
   } else {
-    sw.style.background = color;
-    sw.style.borderRadius = shape === "circle" ? "50%" : shape === "triangle" ? "0" : "2px";
+    row.appendChild(makeShapeSwatch(shapeKind, color, !!hollow));
   }
-  row.appendChild(sw);
   const txt = document.createElement("span");
   txt.textContent = label;
   row.appendChild(txt);
@@ -543,7 +591,7 @@ function makeLegendRow(label, color, shape, inactive){
 function isFilteredOut(d){
   if(hiddenNodeTypes.has(d.type)) return true;
   if(d.type === "party" && hiddenParties.has(d.name)) return true;
-  if(d.type === "councillor" && hiddenParties.has(d.party)) return true;
+  if((d.type === "councillor" || d.type === "parishcouncillor") && hiddenParties.has(d.party)) return true;
   return false;
 }
 function isLinkFilteredOut(l){
@@ -568,6 +616,11 @@ function applyFilters(){
   nodeSel.style("display", d=> isNodeHidden(d) ? "none" : null);
   labelSel.style("display", d=> isNodeHidden(d) ? "none" : null);
   linkSel.style("display", l=> isLinkHidden(l) ? "none" : null);
+  linkSel.style("stroke", l=>{
+    if(l.kind === "social" || !selectionActive) return null; // null = fall back to the CSS default for its kind
+    const dist = linkDistanceFromSelection(l);
+    return dist != null ? colorForDistance(dist, rangeSteps) : null;
+  });
 }
 
 // ---------- Selection, centering, detail panel ----------
@@ -603,14 +656,15 @@ function selectNode(d){
   });
 
   let badges = "";
-  if(d.type==="councillor"){
-    if(!d.ward) badges += `<span class="badge">Parish council only — no authority seat</span>`;
+  const isPersonNode = d.type === "councillor" || d.type === "parishcouncillor";
+  if(isPersonNode){
+    if(d.type === "parishcouncillor") badges += `<span class="badge">Parish council only — no authority seat</span>`;
     if(d.councilPosition) badges += `<span class="badge">${d.councilPosition}</span>`;
     if(d.partyPosition) badges += `<span class="badge">${d.partyPosition}</span>`;
   }
 
   let img = "";
-  if(d.type==="councillor" && d.imageUrl){
+  if(isPersonNode && d.imageUrl){
     img = `<img class="portrait" src="${d.imageUrl}" onerror="this.remove()">`;
   }
 
@@ -642,15 +696,15 @@ function selectNode(d){
     relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]||k}</div>` +
       rels[k].map(n=>`<div class="rel-item" data-id="${n.id}">${n.name}</div>`).join("") + `</div>`;
   });
-  if(d.type !== "councillor"){
-    const members = relLinks.map(l=> l.source.id===d.id ? l.target : l.source).filter(n=>n.type==="councillor");
+  if(!isPersonNode){
+    const members = relLinks.map(l=> l.source.id===d.id ? l.target : l.source).filter(n=>n.type==="councillor" || n.type==="parishcouncillor");
     if(members.length){
       relHtml = `<div class="rel-group"><div class="rel-label">Councillors</div>` +
         members.map(n=>`<div class="rel-item" data-id="${n.id}">${n.name}</div>`).join("") + `</div>` + relHtml;
     }
   }
 
-  panel.innerHTML = `${img}<p class="name">${d.name}</p><p class="kind">${d.type==="councillor" && !d.ward ? "parish councillor" : d.type}</p>${badges}${relHtml}`;
+  panel.innerHTML = `${img}<p class="name">${d.name}</p><p class="kind">${typeLabel(d.type)}</p>${badges}${relHtml}`;
   panel.querySelectorAll(".rel-item").forEach(el=>{
     el.addEventListener("click", ()=>{
       const target = graphData.nodes.find(n=>n.id===el.dataset.id);
