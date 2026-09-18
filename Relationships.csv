@@ -1,5 +1,5 @@
 Id1,Id2,Relationship
-5,6,Brothers
+5,6,Siblings
 12,13,Parent/Child
 15,29,Partners
 30,31,Married
@@ -8,3 +8,13 @@ Id1,Id2,Relationship
 49,50,Married
 36,23,Son-In-Law/Mother-in-Law
 23,9,Parent/Child
+62,63,Married
+35,91,Siblings
+89,40,Married
+38,247,Partners
+96,97,Married
+4,118,Parent/Child
+136,137,Married
+26,57,Married
+241,242,Married
+181,182,Married
