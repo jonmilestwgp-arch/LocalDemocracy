@@ -61,6 +61,9 @@
   #reopenAsideBtn{top:12px;right:12px;}
   #reopenDetailBtn{top:52px;right:12px;}
 
+  .float-action{position:absolute;z-index:5;bottom:12px;left:12px;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:6px 12px;font-size:12px;border-radius:3px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
+  .float-action:hover{background:var(--ink);color:var(--paper);}
+
   main{flex:1;display:flex;min-height:0;}
   #graphWrap{flex:1;position:relative;min-width:0;}
   #graphSvg{width:100%;height:100%;display:block;cursor:grab;}
@@ -84,7 +87,7 @@
 
   #detail{border-top:1px solid var(--line);margin-top:16px;padding-top:16px;}
   #detail .empty{color:var(--ink-soft);line-height:1.5;}
-  #detail img.portrait{width:90px;height:135px;object-fit:cover;border-radius:3px;margin-bottom:10px;display:block;background:var(--line);}
+  #detail img.portrait{height:135px;width:auto;max-width:100%;display:block;border-radius:3px;margin-bottom:10px;background:var(--line);}
   #detail .name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin:0 0 2px;}
   #detail .kind{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);text-transform:lowercase;margin:0 0 12px;}
   .badge{display:inline-block;font-size:11px;padding:2px 7px;border:1px solid var(--line);border-radius:2px;margin:0 6px 6px 0;color:var(--ink-soft);}
@@ -124,6 +127,7 @@
       <button class="float-toggle" id="reopenHeaderBtn">Show controls</button>
       <button class="float-toggle" id="reopenAsideBtn">Show legend</button>
       <button class="float-toggle" id="reopenDetailBtn">Show info</button>
+      <button class="float-action" id="tidyLayoutBtn" title="Re-run the layout using only what's currently visible">↻ Tidy layout</button>
     </div>
     <div id="sidePanels">
       <aside id="legendPane">
@@ -404,7 +408,7 @@ function render(data){
   const width = svg.node().clientWidth, height = svg.node().clientHeight;
 
   simulation = d3.forceSimulation(data.nodes)
-    .force("link", d3.forceLink(data.links).id(d=>d.id).distance(l=> l.kind==="party" ? 110 : l.kind==="social" ? 55 : l.kind==="boundary" ? 65 : 75).strength(0.7))
+    .force("link", d3.forceLink(data.links).id(d=>d.id).distance(linkDistanceByKind).strength(0.7))
     .force("charge", d3.forceManyBody().strength(-160))
     .force("center", d3.forceCenter(width/2, height/2))
     .force("collide", d3.forceCollide(22));
@@ -502,6 +506,7 @@ function buildLegend(data){
       toggleSetMember(hiddenNodeTypes, t.value);
       row.classList.toggle("legend-inactive");
       refreshSelectionVisibility();
+      relayoutVisible();
     });
     legend.appendChild(row);
   });
@@ -511,6 +516,7 @@ function buildLegend(data){
     toggleSetMember(hiddenLinkKinds, "social");
     socialRow.classList.toggle("legend-inactive");
     refreshSelectionVisibility();
+    relayoutVisible();
   });
   legend.appendChild(socialRow);
 
@@ -519,6 +525,7 @@ function buildLegend(data){
     toggleSetMember(hiddenLinkKinds, "boundary");
     boundaryRow.classList.toggle("legend-inactive");
     refreshSelectionVisibility();
+    relayoutVisible();
   });
   legend.appendChild(boundaryRow);
 
@@ -536,6 +543,7 @@ function buildLegend(data){
         toggleSetMember(hiddenParties, p);
         row.classList.toggle("legend-inactive");
         refreshSelectionVisibility();
+      relayoutVisible();
       });
       sub.appendChild(row);
     });
@@ -621,6 +629,24 @@ function applyFilters(){
     const dist = linkDistanceFromSelection(l);
     return dist != null ? colorForDistance(dist, rangeSteps) : null;
   });
+}
+
+function linkDistanceByKind(l){
+  return l.kind==="party" ? 110 : l.kind==="social" ? 55 : l.kind==="boundary" ? 65 : 75;
+}
+
+// Re-runs the force layout using only the currently visible nodes/links, so hidden or
+// filtered-out items stop pushing the visible ones around. Existing positions of nodes
+// that stay visible are kept as a starting point rather than randomised.
+function relayoutVisible(){
+  if(!graphData || !simulation) return;
+  const visibleNodes = graphData.nodes.filter(n=> !isNodeHidden(n));
+  const visibleLinks = graphData.links.filter(l=> !isLinkHidden(l));
+  const width = svg.node().clientWidth, height = svg.node().clientHeight;
+  simulation.nodes(visibleNodes);
+  simulation.force("center", d3.forceCenter(width/2, height/2));
+  simulation.force("link", d3.forceLink(visibleLinks).id(d=>d.id).distance(linkDistanceByKind).strength(0.7));
+  simulation.alpha(1).restart();
 }
 
 // ---------- Selection, centering, detail panel ----------
@@ -809,6 +835,8 @@ function updateSidePanelsVisibility(){
   const bothHidden = legendPaneEl.style.display === "none" && detailPaneEl.style.display === "none";
   sidePanelsEl.style.display = bothHidden ? "none" : "flex";
 }
+
+document.getElementById("tidyLayoutBtn").addEventListener("click", ()=> relayoutVisible());
 
 const rangeSlider = document.getElementById("rangeSlider");
 const rangeValueEl = document.getElementById("rangeValue");
