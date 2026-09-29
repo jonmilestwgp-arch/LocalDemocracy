@@ -9,193 +9,303 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<!-- Font Awesome's JS renderer swaps <i class="fa-…"> for inline SVG (no stylesheet or webfont needed). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/js/all.min.js"></script>
 <style>
   :root{
-    --paper:#EAEDEC;
-    --ink:#1B2430;
-    --ink-soft:#4A5568;
-    --line:#C7CDC9;
-    --panel:#F5F6F5;
-    --teal:#3E6259;
-    --ward:#8A8F85;
-    --parish:#6E7F5C;
-    --con:#0087DC;
-    --lab:#E4003B;
-    --ld:#FAA61A;
-    --grn:#6AB023;
-    --ref:#12B6CF;
-    --ind:#9C9FA6;
-    --other:#7C6A9C;
-    --social:#B23A6B;
-    --boundary:#5B7B8C;
-    --parishward:#B08B3D;
+    --paper:#EAEDEC; --ink:#1B2430; --ink-soft:#4A5568; --line:#C7CDC9; --panel:#F5F6F5; --teal:#3E6259;
+    --relationship:#B23A6B; --connection:#5B7B8C; --nonaffiliated:#B7BCC4;
   }
   @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --paper:#171B1E; --ink:#E7EAE8; --ink-soft:#A7B0AC; --line:#333A38; --panel:#1F2427;
-    }
-  }
-  :root[data-theme="dark"]{
-    --paper:#171B1E; --ink:#E7EAE8; --ink-soft:#A7B0AC; --line:#333A38; --panel:#1F2427;
+    :root{ --paper:#171B1E; --ink:#E7EAE8; --ink-soft:#A7B0AC; --line:#333A38; --panel:#1F2427; }
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;}
   #app{display:flex;flex-direction:column;height:100vh;}
+  .is-hidden{display:none !important;}
 
-  header{padding:16px 24px 12px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;position:relative;}
-  header h1{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0;letter-spacing:0.2px;}
-  header p{margin:2px 0 0;font-size:13px;color:var(--ink-soft);}
-
-  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;}
-  .file-btn{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:6px 12px;font-size:13px;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;border-radius:2px;}
+  /* ---- controls bar ---- */
+  #controls{padding:14px 24px 10px;border-bottom:1px solid var(--line);position:relative;}
+  #controls h1{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0;}
+  #controls .sub{margin:2px 0 10px;font-size:13px;color:var(--ink-soft);}
+  .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;}
+  .toolbar .label{color:var(--ink-soft);}
+  .file-btn{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:5px 10px;font-size:12px;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;border-radius:2px;}
   .file-btn:hover{background:var(--ink);color:var(--paper);}
-  #fileInput,#socialFileInput{display:none;}
-  .note{font-size:11px;color:var(--ink-soft);width:100%;margin-top:2px;}
+  .toolbar input[type=file]{display:none;}
+  #status{font-size:11px;color:var(--ink-soft);margin:8px 0 0;line-height:1.5;}
+  #status .warn{color:#B23A3A;}
+  .formats{font-size:11px;color:var(--ink-soft);margin-top:6px;}
+  .formats summary{cursor:pointer;}
+  .formats code{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+  .formats ul{margin:4px 0 0;padding-left:18px;line-height:1.6;}
 
   .close-btn{position:absolute;top:10px;right:12px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink-soft);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
   .close-btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink);}
 
-  .float-toggle{position:absolute;z-index:5;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:6px 12px;font-size:12px;border-radius:3px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;display:none;}
-  .float-toggle:hover{background:var(--ink);color:var(--paper);}
-  #reopenHeaderBtn{top:12px;left:12px;}
-  #reopenAsideBtn{top:12px;right:12px;}
-  #reopenDetailBtn{top:52px;right:12px;}
-
-  .float-action{position:absolute;z-index:5;bottom:12px;left:12px;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:6px 12px;font-size:12px;border-radius:3px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
-  .float-action:hover{background:var(--ink);color:var(--paper);}
-
+  /* ---- graph area ---- */
   main{flex:1;display:flex;min-height:0;}
   #graphWrap{flex:1;position:relative;min-width:0;}
   #graphSvg{width:100%;height:100%;display:block;cursor:grab;}
   #graphSvg:active{cursor:grabbing;}
+  .float-btn{position:absolute;z-index:5;background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:6px 12px;font-size:12px;border-radius:3px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;}
+  .float-btn:hover{background:var(--ink);color:var(--paper);}
+  .float-btn.reopen{display:none;}
+  .float-btn.reopen.is-shown{display:block;}
+  #reopenControls{top:12px;left:12px;}
+  #reopenLegend{top:12px;right:12px;}
+  #reopenInfo{top:52px;right:12px;}
+  #tidyBtn{bottom:12px;left:12px;}
+  #tidyBtn.needs-tidy:not(:hover){border-color:var(--teal);color:var(--teal);font-weight:600;}
 
+  .link{stroke:var(--line);stroke-width:1.3px;fill:none;}
+  .link.relationship{stroke:var(--relationship);stroke-width:1.5px;stroke-dasharray:4,3;}
+  .link.connection{stroke:var(--connection);stroke-width:2px;stroke-dasharray:1,3;}
+  .halo{fill:none;stroke:var(--ink);stroke-width:2;stroke-opacity:0;}
+  .node.selected .halo{stroke-opacity:1;}
+  .node-label{font-size:11px;fill:var(--ink);pointer-events:none;font-family:'IBM Plex Sans',sans-serif;}
+  .node-label.selected{font-weight:600;}
+
+  /* ---- side panels ---- */
+  #sidePanels{width:320px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column;}
   aside{width:100%;flex:1;min-height:0;background:var(--panel);padding:18px;overflow-y:auto;font-size:13px;position:relative;}
-  #sidePanels{width:310px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column;}
   #legendPane{border-bottom:1px solid var(--line);}
   aside h2{font-family:'Fraunces',serif;font-size:15px;font-weight:600;margin:0 0 4px;}
-  aside .legend-hint{font-size:11px;color:var(--ink-soft);margin:0 0 10px;}
-  .legend-row{display:flex;align-items:center;gap:8px;margin:5px 0;color:var(--ink-soft);cursor:pointer;padding:3px 4px;border-radius:3px;user-select:none;}
+  .hint{font-size:11px;color:var(--ink-soft);margin:0 0 10px;}
+
+  .range{margin:4px 0 14px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .range label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:6px;}
+  .range input{width:100%;accent-color:var(--teal);}
+
+  .legend-row{display:flex;align-items:center;gap:8px;margin:4px 0;color:var(--ink-soft);cursor:pointer;padding:3px 4px;border-radius:3px;user-select:none;}
   .legend-row:hover{background:var(--paper);}
-  .legend-row.legend-inactive{opacity:0.4;text-decoration:line-through;}
-  .legend-swatch{width:12px;height:12px;flex-shrink:0;}
+  .legend-row.off{opacity:0.4;}
+  .legend-row.off .legend-label{text-decoration:line-through;}
+  .legend-label{flex:1;}
+  .legend-count{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+  .swatch{width:18px;height:18px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;}
+  .swatch.round{border-radius:50%;width:16px;height:16px;margin:1px;}
+  .swatch.hollow{background:transparent !important;border:2px dashed;}
+  .swatch-line{width:18px;height:0;border-top:2px dashed;flex-shrink:0;}
+  .swatch-line.relationship{border-top-color:var(--relationship);}
+  .swatch-line.connection{border-top-color:var(--connection);border-top-style:dotted;}
   .legend-sub{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
   .legend-sub-title{font-size:11px;color:var(--ink-soft);margin-bottom:2px;font-family:'IBM Plex Mono',monospace;}
 
-  .range-control{margin:4px 0 14px;padding-bottom:12px;border-bottom:1px solid var(--line);}
-  .range-control label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:6px;}
-  .range-control input[type=range]{width:100%;accent-color:var(--teal);}
-
-  #detail{border-top:1px solid var(--line);margin-top:16px;padding-top:16px;}
   #detail .empty{color:var(--ink-soft);line-height:1.5;}
-  #detail img.portrait{height:135px;width:auto;max-width:100%;display:block;border-radius:3px;margin-bottom:10px;background:var(--line);}
+  #detail img.portrait{height:135px;width:auto;max-width:100%;object-fit:contain;display:block;border-radius:3px;margin-bottom:10px;background:var(--line);}
   #detail .name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin:0 0 2px;}
-  #detail .kind{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);text-transform:lowercase;margin:0 0 12px;}
+  #detail .kind{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin:0 0 12px;}
+  #detail .comment{font-size:12px;color:var(--ink-soft);font-style:italic;margin:0 0 10px;line-height:1.5;}
   .badge{display:inline-block;font-size:11px;padding:2px 7px;border:1px solid var(--line);border-radius:2px;margin:0 6px 6px 0;color:var(--ink-soft);}
   .rel-group{margin-top:12px;}
   .rel-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
   .rel-item{padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer;}
   .rel-item:hover{color:var(--teal);}
-
-  .node-label{font-size:11px;fill:var(--ink);pointer-events:none;font-family:'IBM Plex Sans',sans-serif;}
-  .link{stroke:var(--line);stroke-width:1.3px;}
-  .link.social{stroke:var(--social);stroke-width:1.5px;stroke-dasharray:4,3;}
-  .link.boundary{stroke:var(--boundary);stroke-width:2px;stroke-dasharray:1,3;}
+  .rel-note{color:var(--ink-soft);}
 </style>
 </head>
 <body>
 <div id="app">
-  <header>
-    <button class="close-btn" id="closeHeaderBtn" title="Hide controls">✕</button>
-    <div>
-      <h1>Council Structure Map</h1>
-      <p>Councillors, wards, parishes, parties and personal ties — how they connect.</p>
-    </div>
-    <div class="toolbar">
-      <button class="file-btn" id="loadBtn">Load people CSV</button>
-      <button class="file-btn" id="loadSocialBtn">Load relationships CSV</button>
-      <button class="file-btn" id="loadBoundaryBtn">Load ward–parish CSV</button>
-      <button class="file-btn" id="sampleBtn">Use sample data</button>
-      <input type="file" id="fileInput" accept=".csv">
-      <input type="file" id="socialFileInput" accept=".csv">
-      <input type="file" id="boundaryFileInput" accept=".csv">
-      <span class="note" id="statusNote">People CSV columns: Id, Name, Ward, CouncilPosition, Party, PartyPosition, then for each of 4 parishes: ParishN, ParishPositionN, ParishWardN, then ImageUrl. Relationships CSV: Id1, Id2, Relationship. Ward–parish CSV: Ward, Parish, ParishWard (optional). On load, the page tries fetching People.csv, Wards.csv and Relationships.csv from its own folder automatically.</span>
-    </div>
+  <header id="controls">
+    <button class="close-btn" id="closeControls" title="Hide controls">✕</button>
+    <h1>Council Structure Map</h1>
+    <p class="sub">People, entities, and the roles and relationships that connect them.</p>
+    <div class="toolbar" id="loaders"><span class="label">Load:</span></div>
+    <p id="status"></p>
+    <details class="formats">
+      <summary>File formats</summary>
+      <ul>
+        <li><code>People.csv</code> — Id, Name, Comments, PictureUrl</li>
+        <li><code>Entities.csv</code> — Id, Name, EntityType, Funding, Color (Color is optional and overrides the type's colour)</li>
+        <li><code>EntityRole.csv</code> — PersonId, EntityId, Role (one row per role; add more rows for more roles)</li>
+        <li><code>EntityConnections.csv</code> — EntityId1, EntityId2, ConnectionType</li>
+        <li><code>Relationships.csv</code> — PersonId1, PersonId2, Relationship (write "Parent/Child" for a directional one: first word describes Person 1)</li>
+        <li><code>EntityTypes.csv</code> — EntityType, Color, Icon (a Font Awesome class such as <code>fa-solid fa-tree</code>). Any type not listed still works, with an automatic colour and icon.</li>
+      </ul>
+    </details>
   </header>
+
   <main>
     <div id="graphWrap">
       <svg id="graphSvg"></svg>
-      <button class="float-toggle" id="reopenHeaderBtn">Show controls</button>
-      <button class="float-toggle" id="reopenAsideBtn">Show legend</button>
-      <button class="float-toggle" id="reopenDetailBtn">Show info</button>
-      <button class="float-action" id="tidyLayoutBtn" title="Re-run the layout using only what's currently visible">↻ Tidy layout</button>
+      <button class="float-btn reopen" id="reopenControls">Show controls</button>
+      <button class="float-btn reopen" id="reopenLegend">Show legend</button>
+      <button class="float-btn reopen" id="reopenInfo">Show info</button>
+      <button class="float-btn" id="tidyBtn" title="Re-run the layout using only what is currently visible">↻ Tidy layout</button>
     </div>
     <div id="sidePanels">
       <aside id="legendPane">
-        <button class="close-btn" id="closeAsideBtn" title="Hide legend">✕</button>
+        <button class="close-btn" id="closeLegend" title="Hide legend">✕</button>
         <h2>Legend</h2>
-        <p class="legend-hint">Click any item to filter it out of the diagram. Hollow rings are parish councillors with no local authority seat.</p>
-        <div class="range-control">
-          <label for="rangeSlider">Show connections within <span id="rangeValue">1</span> step(s) of the selected item</label>
+        <p class="hint">Click an item to hide it. Dashed rings are people with no seat at the main level.</p>
+        <div class="range">
+          <label for="rangeSlider">Show what is within <span id="rangeValue">1</span> step(s) of the selected item</label>
           <input type="range" id="rangeSlider" min="1" max="5" step="1" value="1">
         </div>
         <div id="legend"></div>
       </aside>
-      <aside id="detailPane">
-        <button class="close-btn" id="closeDetailBtn" title="Hide info">✕</button>
+      <aside id="infoPane">
+        <button class="close-btn" id="closeInfo" title="Hide info">✕</button>
         <h2>Info</h2>
-        <div id="detail"><div class="empty">Click any person, ward, parish or party to see its connections and centre the diagram on it. Drag nodes to rearrange; scroll to zoom.</div></div>
+        <div id="detail"></div>
       </aside>
     </div>
   </main>
 </div>
 
 <script>
-// ---------- Party colour map ----------
-const PARTY_COLORS = {
-  "conservative": "var(--con)", "conservative party": "var(--con)",
-  "labour": "var(--lab)", "labour party": "var(--lab)",
-  "liberal democrat": "var(--ld)", "liberal democrats": "var(--ld)", "lib dem": "var(--ld)",
-  "green": "var(--grn)", "green party": "var(--grn)",
-  "reform": "var(--ref)", "reform uk": "var(--ref)",
-  "independent": "var(--ind)", "independents": "var(--ind)"
+'use strict';
+
+/* =====================================================================
+   1. CONFIGURATION — the only places the app knows about specific types
+   ===================================================================== */
+const CONFIG = {
+  personColorType: 'Party',   // a person is coloured by their entity of this type
+  seatType: 'Ward',           // a person with no role at an entity of this type is drawn as a dashed ring
+  typeOrder: ['Council', 'Ward', 'Parish', 'ParishWard', 'Party'],   // display order; other types follow alphabetically
+  defaultIcon: 'fa-solid fa-shapes',
+  linkDistance: { role: 80, connection: 65, relationship: 55 },
 };
-function partyColor(name){
-  const key = (name||"").trim().toLowerCase();
-  if(!key) return "var(--ind)"; // no party listed — treat like unaffiliated
-  return PARTY_COLORS[key] || "var(--other)";
-}
-function resolveVar(v){
-  if(v.startsWith("var(")) return getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim() || "#7C6A9C";
-  return v;
-}
-function safeId(s){ return String(s).replace(/[^a-zA-Z0-9_-]/g,"_"); }
-function typeLabel(type){
-  const map = {parishcouncillor:"parish councillor", parishward:"parish ward"};
-  return map[type] || type;
-}
 
-// ---------- Sample dataset ----------
-const SAMPLE_CSV = `Id,Name,Ward,CouncilPosition,Party,PartyPosition,Parish1,ParishPosition1,ParishWard1,Parish2,ParishPosition2,ParishWard2,Parish3,ParishPosition3,ParishWard3,Parish4,ParishPosition4,ParishWard4,ImageUrl
-1,Alan Whitcombe,Meadowgate,Council Leader,Conservative,Group Leader,Meadowgate Parish,Chair,,,,,,,,,,,
-2,Priya Shah,Meadowgate,,Conservative,,Meadowgate Parish,,,Oldbridge Parish,,Oldbridge West,,,,,,,
-3,Robert Tanner,Northfield,Deputy Leader,Labour,Deputy Group Leader,Northfield Parish,,,,,,,,,,,,
-4,Denise Okafor,Northfield,,Labour,,Northfield Parish,,,,,,,,,,,,
-5,Margaret Ellison,Riverside,,Liberal Democrat,Group Leader,Riverside Parish,,,Southgate Parish,,,,,,,,,
-6,Colin Hargreaves,Riverside,,Independent,,Riverside Parish,,,,,,,,,,,,
-7,Susan Byrne,Southgate,Committee Chair,Green,Group Leader,Southgate Parish,,,,,,,,,,,,
-8,Frank Delaney,Southgate,,Conservative,,Southgate Parish,,,Oldbridge Parish,,Oldbridge East,,,,,,,
-9,Helen Marsh,Oldbridge,,Labour,,Oldbridge Parish,Vice Chair,Oldbridge East,Meadowgate Parish,,,,,,,,,
-10,Tom Ridgeway,Westcombe,Mayor,Conservative,,Westcombe Parish,,,Northfield Parish,,,,,,,,,
-11,Janet Pruitt,Westcombe,,Liberal Democrat,,Westcombe Parish,,,,,,,,,,,,
-12,Michael Osei,Ashfield,,Green,,Ashfield Parish,,,Riverside Parish,,,,,,,,,
-13,Karen Voss,Ashfield,,Reform UK,Group Leader,Ashfield Parish,,,,,,,,,,,,
-14,Barbara Quinn,,,Independent,,Meadowgate Parish,Chair,,,,,,,,,,,
-15,Nigel Foss,,,,,Southgate Parish,,,,,,,,,,,,
-16,Diane Cho,,,Green,,Ashfield Parish,,,,,,,,,,,,
-17,Oliver Bright,Northfield,,Labour,,,,,,,,,,,,,,
-18,Grace Sutton,Westcombe,,Conservative,,,,,,,,,,,,,,`;
+// The six files, in the order they appear in the toolbar.
+const TABLES = [
+  { key: 'people',        file: 'People.csv' },
+  { key: 'entities',      file: 'Entities.csv' },
+  { key: 'roles',         file: 'EntityRole.csv' },
+  { key: 'connections',   file: 'EntityConnections.csv' },
+  { key: 'relationships', file: 'Relationships.csv' },
+  { key: 'types',         file: 'EntityTypes.csv' },
+];
 
-const SAMPLE_SOCIAL_CSV = `Id1,Id2,Relationship
+/* =====================================================================
+   2. SAMPLE DATA (used when no CSV files are found next to this page)
+   ===================================================================== */
+const SAMPLE = {
+  people: `Id,Name,Comments,PictureUrl
+1,Alan Whitcombe,,
+2,Priya Shah,,
+3,Robert Tanner,,
+4,Denise Okafor,,
+5,Margaret Ellison,,
+6,Colin Hargreaves,,
+7,Susan Byrne,,
+8,Frank Delaney,,
+9,Helen Marsh,,
+10,Tom Ridgeway,,
+11,Janet Pruitt,,
+12,Michael Osei,,
+13,Karen Voss,,
+14,Barbara Quinn,,
+15,Nigel Foss,,
+16,Diane Cho,,
+17,Oliver Bright,,
+18,Grace Sutton,,`,
+  entities: `Id,Name,EntityType,Funding,Color
+C1,Fictional Borough Council,Council,Local taxation and central government grant,
+W1,Meadowgate,Ward,,
+W2,Northfield,Ward,,
+W3,Riverside,Ward,,
+W4,Southgate,Ward,,
+W5,Oldbridge,Ward,,
+W6,Westcombe,Ward,,
+W7,Ashfield,Ward,,
+P1,Meadowgate Parish,Parish,,
+P2,Oldbridge Parish,Parish,,
+P3,Northfield Parish,Parish,,
+P4,Riverside Parish,Parish,,
+P5,Southgate Parish,Parish,,
+P6,Westcombe Parish,Parish,,
+P7,Ashfield Parish,Parish,,
+PW1,Oldbridge East,ParishWard,,
+PW2,Oldbridge West,ParishWard,,
+PA1,Conservative,Party,,#0087DC
+PA2,Labour,Party,,#E4003B
+PA3,Liberal Democrats,Party,,#FAA61A
+PA4,Green,Party,,#6AB023
+PA5,Reform UK,Party,,#12B6CF
+PA6,Independent,Party,,#9C9FA6
+PA7,Non-affiliated,Party,,#B7BCC4
+E1,House of Commons,Parliament,Public funds (Consolidated Fund),`,
+  roles: `PersonId,EntityId,Role
+1,W1,
+1,C1,Council Leader
+1,PA1,Group Leader
+1,P1,Chair
+2,W1,
+2,PA1,
+2,P1,
+2,P2,
+2,PW2,
+3,W2,
+3,C1,Deputy Leader
+3,PA2,Deputy Group Leader
+3,P3,
+4,W2,
+4,PA2,
+4,P3,
+5,W3,
+5,PA3,Group Leader
+5,P4,
+5,P5,
+6,W3,
+6,PA6,
+6,P4,
+7,W4,
+7,C1,Committee Chair
+7,PA4,Group Leader
+7,P5,
+8,W4,
+8,PA1,
+8,P5,
+8,P2,
+8,PW1,
+9,W5,
+9,PA2,
+9,P2,Vice Chair
+9,PW1,
+9,P1,
+10,W6,
+10,C1,Mayor
+10,PA1,
+10,P6,
+10,P3,
+10,E1,MP
+11,W6,
+11,PA3,
+11,P6,
+12,W7,
+12,PA4,
+12,P7,
+12,P4,
+13,W7,
+13,C1,Group Leader
+13,PA5,
+13,E1,MP
+14,PA6,
+14,P1,Chair
+15,PA7,
+15,P5,
+16,PA4,
+16,P7,
+17,W2,
+17,PA2,
+18,W6,
+18,PA1,`,
+  connections: `EntityId1,EntityId2,ConnectionType
+W1,P1,Boundary
+W2,P3,Boundary
+W3,P4,Boundary
+W4,P5,Boundary
+W4,P2,Boundary
+PW1,P2,Boundary
+PW1,W4,Boundary
+W5,P2,Boundary
+PW2,P2,Boundary
+PW2,W5,Boundary
+W6,P6,Boundary
+W7,P7,Boundary`,
+  relationships: `PersonId1,PersonId2,Relationship
 3,4,Married
 5,6,Partner
 10,11,Father/Daughter
@@ -203,692 +313,629 @@ const SAMPLE_SOCIAL_CSV = `Id1,Id2,Relationship
 7,8,Sibling
 9,12,Business partner
 1,18,Parent/Child
-4,17,Parent/Child`;
+4,17,Parent/Child`,
+  types: `EntityType,Color,Icon
+Council,#4B5FA6,fa-solid fa-landmark
+Ward,#8A8F85,fa-solid fa-square
+Parish,#6E7F5C,fa-solid fa-tree
+ParishWard,#B08B3D,fa-solid fa-gem
+Party,#7C6A9C,fa-solid fa-flag
+Parliament,#8B3A5A,fa-solid fa-scale-balanced`,
+};
 
-const SAMPLE_BOUNDARY_CSV = `Ward,Parish,ParishWard
-Meadowgate,Meadowgate Parish,
-Northfield,Northfield Parish,
-Riverside,Riverside Parish,
-Southgate,Southgate Parish,
-Southgate,Oldbridge Parish,Oldbridge East
-Oldbridge,Oldbridge Parish,Oldbridge West
-Westcombe,Westcombe Parish,
-Ashfield,Ashfield Parish,`;
+/* =====================================================================
+   3. THE MODEL
+      Six tables in  →  { nodes, links } out.  No DOM, no drawing.
 
-const DIRECTIONAL_RELATIONSHIPS = ["father/daughter","father/son","mother/daughter","mother/son","parent/child"];
+      node  = a person or an entity        { uid, kind, type, id, name, links[] , … }
+      link  = one line between two nodes   { kind, source, target, … }
+              kind 'role'         person  → entity   (label = role)
+              kind 'connection'   entity  ↔ entity   (label = connection type)
+              kind 'relationship' person  ↔ person   (label = relationship)
+   ===================================================================== */
+const clean = v => (v == null ? '' : String(v)).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 
-let peopleRows = [];
-let socialRows = [];
-let boundaryRows = [];
-let graphData = null;
-let linkSel, nodeSel, labelSel, simulation;
+function autoColor(text) {                     // a stable colour for any type we have no style for
+  let h = 0;
+  for (const ch of text) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return `hsl(${h % 360}, 45%, 45%)`;
+}
 
-// filter state, driven by the legend
-const hiddenNodeTypes = new Set();   // 'councillor' | 'ward' | 'parish' | 'party' | 'parishward'
-const hiddenLinkKinds = new Set();   // 'social' | 'boundary'
-const hiddenParties = new Set();     // specific party names
+const otherEnd = (link, node) => (link.source === node ? link.target : link.source);
 
-// selection-range state, driven by the slider — controls which nodes disappear when something is selected
-let rangeSteps = 1;
-let currentSelected = null;
-let selectionActive = false;
-let activeSet = null;     // Set of node ids within range of currentSelected
-let activeDepths = null;  // Map of node id -> hop distance from currentSelected
+function buildModel(tables) {
+  const problems = [];
+  const nodes = [];
+  const links = [];
+  const byUid = new Map();
+  const people = new Map();      // csv Id → node
+  const entities = new Map();    // csv Id → node
+  const typeStyles = new Map();  // EntityType → { color, icon }
 
-function computeDepths(d, maxDepth){
-  const visited = new Map([[d.id, 0]]);
-  let frontier = [d.id];
-  for(let depth=1; depth<=maxDepth && frontier.length; depth++){
+  const skip = (file, row, why) => problems.push(`${file}: ${why} — ${JSON.stringify(row)}`);
+
+  for (const r of tables.types) {
+    const type = clean(r.EntityType);
+    if (type) typeStyles.set(type, { color: clean(r.Color) || autoColor(type), icon: clean(r.Icon) || CONFIG.defaultIcon });
+  }
+  const styleOf = type => {
+    if (!typeStyles.has(type)) typeStyles.set(type, { color: autoColor(type), icon: CONFIG.defaultIcon });
+    return typeStyles.get(type);
+  };
+
+  const addNode = node => { node.links = []; nodes.push(node); byUid.set(node.uid, node); return node; };
+  const addLink = (kind, source, target, extra) => {
+    const link = { kind, source, target, ...extra };
+    links.push(link);
+    source.links.push(link);
+    target.links.push(link);
+  };
+
+  // --- people ---
+  for (const r of tables.people) {
+    const id = clean(r.Id), name = clean(r.Name);
+    if (!id && !name) continue;
+    if (!id || !name) { skip('People.csv', r, 'needs both an Id and a Name'); continue; }
+    if (people.has(id)) { skip('People.csv', r, `duplicate Id ${id}`); continue; }
+    people.set(id, addNode({
+      uid: 'p:' + id, kind: 'person', type: 'Person', id, name,
+      comments: clean(r.Comments), picture: clean(r.PictureUrl),
+      hasSeat: false, colorEntity: null,
+    }));
+  }
+
+  // --- entities ---
+  for (const r of tables.entities) {
+    const id = clean(r.Id), name = clean(r.Name), type = clean(r.EntityType);
+    if (!id && !name) continue;
+    if (!id || !name || !type) { skip('Entities.csv', r, 'needs an Id, a Name and an EntityType'); continue; }
+    if (entities.has(id)) { skip('Entities.csv', r, `duplicate Id ${id}`); continue; }
+    const style = styleOf(type);
+    entities.set(id, addNode({
+      uid: 'e:' + id, kind: 'entity', type, id, name,
+      funding: clean(r.Funding), color: clean(r.Color) || style.color, icon: style.icon,
+    }));
+  }
+
+  // --- roles: person → entity ---
+  const seen = new Set();
+  for (const r of tables.roles) {
+    const pid = clean(r.PersonId), eid = clean(r.EntityId), role = clean(r.Role);
+    if (!pid && !eid) continue;
+    const person = people.get(pid), entity = entities.get(eid);
+    if (!person || !entity) { skip('EntityRole.csv', r, !person ? `no person with Id ${pid}` : `no entity with Id ${eid}`); continue; }
+    const key = [pid, eid, role].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    addLink('role', person, entity, { label: role });
+    if (entity.type === CONFIG.seatType) person.hasSeat = true;
+    if (entity.type === CONFIG.personColorType && !person.colorEntity) person.colorEntity = entity;
+  }
+
+  // --- connections: entity ↔ entity ---
+  seen.clear();
+  for (const r of tables.connections) {
+    const a = clean(r.EntityId1), b = clean(r.EntityId2), label = clean(r.ConnectionType);
+    if (!a && !b) continue;
+    const ea = entities.get(a), eb = entities.get(b);
+    if (!ea || !eb) { skip('EntityConnections.csv', r, `no entity with Id ${!ea ? a : b}`); continue; }
+    if (ea === eb) { skip('EntityConnections.csv', r, 'an entity cannot connect to itself'); continue; }
+    const key = [a < b ? a + '|' + b : b + '|' + a, label].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    addLink('connection', ea, eb, { label });
+  }
+
+  // --- relationships: person ↔ person ---
+  seen.clear();
+  for (const r of tables.relationships) {
+    const a = clean(r.PersonId1), b = clean(r.PersonId2), label = clean(r.Relationship);
+    if (!a && !b) continue;
+    const pa = people.get(a), pb = people.get(b);
+    if (!pa || !pb) { skip('Relationships.csv', r, `no person with Id ${!pa ? a : b}`); continue; }
+    if (pa === pb) { skip('Relationships.csv', r, 'a person cannot have a relationship with themselves'); continue; }
+    const key = [a, b, label].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    addLink('relationship', pa, pb, { label, directional: label.includes('/') });
+  }
+
+  const rank = type => { const i = CONFIG.typeOrder.indexOf(type); return i < 0 ? 999 : i; };
+  const entityTypes = [...new Set(nodes.filter(n => n.kind === 'entity').map(n => n.type))]
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+
+  return { nodes, links, byUid, typeStyles, entityTypes, problems };
+}
+
+/* =====================================================================
+   4. REACH — everything within N steps of a node.
+      A plain breadth-first search: one link is one step. Nothing else.
+      canCross(link, node) lets hidden things act as walls.
+   ===================================================================== */
+function reach(start, maxSteps, canCross) {
+  const distance = new Map([[start, 0]]);
+  let frontier = [start];
+  for (let step = 1; step <= maxSteps && frontier.length; step++) {
     const next = [];
-    graphData.links.forEach(l=>{
-      if(isLinkFilteredOut(l)) return; // filtered-out links/nodes act as walls, not just invisible
-      const s = l.source.id, t = l.target.id;
-      if(frontier.includes(s) && !visited.has(t)){ visited.set(t, depth); next.push(t); }
-      else if(frontier.includes(t) && !visited.has(s)){ visited.set(s, depth); next.push(s); }
-    });
+    for (const node of frontier) {
+      for (const link of node.links) {
+        const other = otherEnd(link, node);
+        if (distance.has(other) || !canCross(link, other)) continue;
+        distance.set(other, step);
+        next.push(other);
+      }
+    }
     frontier = next;
   }
-  return visited;
+  return distance;
 }
 
-// Distance of a link from the selected node = the deeper of its two ends (1 = touches the
-// selected node directly). Returns null if either end isn't within range.
-function linkDistanceFromSelection(l){
-  if(!activeDepths) return null;
-  const ds = activeDepths.get(l.source.id), dt = activeDepths.get(l.target.id);
-  if(ds === undefined || dt === undefined) return null;
-  return Math.max(ds, dt);
-}
+/* =====================================================================
+   5. STATE, FILTERS AND VISIBILITY
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const PERSON_WITH_SEAT = 'person-with-seat';
+const PERSON_NO_SEAT = 'person-no-seat';
 
-let distColorScale = null;
-function colorForDistance(dist, maxDist){
-  if(!distColorScale){
-    distColorScale = d3.interpolateRgb(resolveVar("var(--ink)"), resolveVar("var(--line)"));
+const tables = { people: [], entities: [], roles: [], connections: [], relationships: [], types: [] };
+const state = {
+  model: null,
+  selected: null,
+  range: 1,
+  reachMap: null,             // Map(node → steps) while something is selected, otherwise null
+  frozen: false,              // true after a manual drag: the physics stays off until the layout is re-run
+  hiddenTypes: new Set(),     // entity types, plus PERSON_WITH_SEAT / PERSON_NO_SEAT
+  hiddenKinds: new Set(),     // 'relationship' | 'connection'
+  hiddenNodes: new Set(),     // individual node uids (the "by party" list)
+};
+
+function isFiltered(node) {
+  if (node.kind === 'person') {
+    return state.hiddenTypes.has(node.hasSeat ? PERSON_WITH_SEAT : PERSON_NO_SEAT)
+        || (!!node.colorEntity && state.hiddenNodes.has(node.colorEntity.uid));
   }
-  const denom = Math.max(maxDist - 1, 1);
-  const t = Math.min(Math.max((dist - 1) / denom, 0), 1);
-  return distColorScale(t);
+  return state.hiddenTypes.has(node.type) || state.hiddenNodes.has(node.uid);
 }
+const canCross = (link, node) => !state.hiddenKinds.has(link.kind) && !isFiltered(node);
+const isNodeVisible = node => !isFiltered(node) && (!state.reachMap || state.reachMap.has(node));
+const isLinkVisible = link => !state.hiddenKinds.has(link.kind) && isNodeVisible(link.source) && isNodeVisible(link.target);
 
-function refreshSelectionVisibility(){
-  selectionActive = !!currentSelected;
-  activeDepths = currentSelected ? computeDepths(currentSelected, rangeSteps) : null;
-  activeSet = activeDepths ? new Set(activeDepths.keys()) : null;
-  applyFilters();
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
 }
+const personColor = node => (node.colorEntity ? node.colorEntity.color : cssVar('--nonaffiliated', '#B7BCC4'));
 
-const svg = d3.select("#graphSvg");
-const zoomLayer = svg.append("g");
-const zoomBehavior = d3.zoom().scaleExtent([0.3,3]).on("zoom", (e)=> zoomLayer.attr("transform", e.transform));
-svg.call(zoomBehavior);
+/* =====================================================================
+   6. THE VIEW — drawing the graph
+   ===================================================================== */
+const svg = d3.select('#graphSvg');
+const width = () => svg.node().clientWidth || 800;
+const height = () => svg.node().clientHeight || 600;
 
-function ensureArrowMarker(){
-  if(!svg.select("defs.arrow-defs").empty()) return;
-  const defs = svg.append("defs").attr("class","arrow-defs");
-  defs.append("marker")
-    .attr("id","arrow-social")
-    .attr("viewBox","0 -5 10 10")
-    .attr("refX", 8).attr("refY", 0)
-    .attr("markerWidth", 7).attr("markerHeight", 7)
-    .attr("orient","auto")
-    .append("path").attr("d","M0,-5L10,0L0,5").attr("fill", resolveVar("var(--social)"));
-}
+const defs = svg.append('defs');
+defs.append('marker').attr('id', 'arrow').attr('viewBox', '0 -5 10 10')
+  .attr('refX', 22).attr('refY', 0).attr('markerWidth', 7).attr('markerHeight', 7).attr('orient', 'auto')
+  .append('path').attr('d', 'M0,-5L10,0L0,5').attr('fill', '#B23A6B');
 
-// ---------- Build nodes/links from rows ----------
-function buildGraph(rows, socialRows, boundaryRows){
-  const nodes = new Map();
-  const links = [];
-  const idToNodeId = new Map(); // csv Id -> internal node id
+const world = svg.append('g');
+const zoom = d3.zoom().scaleExtent([0.2, 4])
+  .extent(() => [[0, 0], [width(), height()]])
+  .on('zoom', e => world.attr('transform', e.transform));
+svg.call(zoom);
+svg.on('click', e => { if (e.target === svg.node()) clearSelection(); });
 
-  function ensureNode(id, type, name, extra){
-    if(!nodes.has(id)) nodes.set(id, {id, type, name, ...extra});
-    return nodes.get(id);
-  }
+let sim = null;
+let linkSel = null, nodeSel = null, labelSel = null;
 
-  rows.forEach(r=>{
-    const name = (r.Name||"").trim();
-    const rawId = (r.Id||"").trim();
-    if(!name || !rawId) return;
-    const cId = "councillor:"+rawId;
-    const ward = (r.Ward||"").trim();
-    const nodeType = ward ? "councillor" : "parishcouncillor";
-    idToNodeId.set(rawId, cId);
-    ensureNode(cId, nodeType, name, {
-      recordId: rawId,
-      councilPosition: (r.CouncilPosition||"").trim(),
-      party: (r.Party||"").trim(),
-      partyPosition: (r.PartyPosition||"").trim(),
-      ward: ward,
-      imageUrl: (r.ImageUrl||"").trim()
-    });
-
-    if(ward){
-      const wId = "ward:"+ward;
-      ensureNode(wId, "ward", ward, {});
-      links.push({source:cId, target:wId, kind:"ward"});
+// Dragging is a manual change. It switches the physics off, so the node stays where you drop it and
+// nothing else moves. The layout only runs again on Tidy layout, a legend toggle, or (after a manual
+// change) a new selection. A tap wobbles a little, so small movements are ignored.
+let dragOrigin = null, dragMoved = false;
+const drag = d3.drag()
+  .on('start', e => { dragOrigin = { x: e.x, y: e.y }; dragMoved = false; })
+  .on('drag', (e, d) => {
+    if (!dragMoved) {
+      const slop = 5 / d3.zoomTransform(svg.node()).k;
+      if (Math.hypot(e.x - dragOrigin.x, e.y - dragOrigin.y) < slop) return;
+      dragMoved = true;
+      if (sim) sim.stop();
+      setFrozen(true);
     }
-
-    const party = (r.Party||"").trim();
-    if(party){
-      const pId = "party:"+party;
-      ensureNode(pId, "party", party, {});
-      links.push({source:cId, target:pId, kind:"party"});
-    }
-
-    for(let i=1;i<=4;i++){
-      const parish = (r["Parish"+i]||"").trim();
-      const position = (r["ParishPosition"+i]||"").trim();
-      const parishWardName = (r["ParishWard"+i]||"").trim();
-      if(parish){
-        const parId = "parish:"+parish;
-        ensureNode(parId, "parish", parish, {});
-        links.push({source:cId, target:parId, kind:"parish", position});
-      }
-      if(parishWardName && parish){
-        const pwId = "parishward:"+parish+"|"+parishWardName;
-        ensureNode(pwId, "parishward", parishWardName, {parentParish: parish});
-        links.push({source:cId, target:pwId, kind:"parishward"});
-      }
-    }
+    d.x = e.x;
+    d.y = e.y;
+    ticked();
   });
 
-  const skippedSocial = [];
-  (socialRows||[]).forEach(r=>{
-    const id1 = (r.Id1||"").trim(), id2 = (r.Id2||"").trim(), rel = (r.Relationship||"").trim();
-    if(!id1 || !id2 || !rel) return;
-    const n1 = idToNodeId.get(id1), n2 = idToNodeId.get(id2);
-    if(!n1 || !n2){ skippedSocial.push(`${id1} — ${id2}`); return; }
-    const directional = DIRECTIONAL_RELATIONSHIPS.includes(rel.toLowerCase());
-    links.push({source:n1, target:n2, kind:"social", label:rel, directional});
-  });
-
-  (boundaryRows||[]).forEach(r=>{
-    const ward = (r.Ward||"").trim(), parish = (r.Parish||"").trim();
-    const parishWard = (r.ParishWard||"").trim();
-    if(!ward || !parish) return;
-    const wId = "ward:"+ward, parId = "parish:"+parish;
-    ensureNode(wId, "ward", ward, {});
-    ensureNode(parId, "parish", parish, {});
-    links.push({source:wId, target:parId, kind:"boundary"});
-
-    if(parishWard){
-      const pwId = "parishward:"+parish+"|"+parishWard;
-      ensureNode(pwId, "parishward", parishWard, {parentParish: parish});
-      links.push({source:pwId, target:parId, kind:"boundary"});
-      links.push({source:pwId, target:wId, kind:"boundary"});
-    }
-  });
-
-  return {nodes: Array.from(nodes.values()), links, skippedSocial};
+function setFrozen(frozen) {
+  state.frozen = frozen;
+  $('tidyBtn').classList.toggle('needs-tidy', frozen);
 }
 
-function colorFor(d){
-  if(d.type === "councillor" || d.type === "parishcouncillor") return resolveVar(partyColor(d.party));
-  if(d.type === "ward") return resolveVar("var(--ward)");
-  if(d.type === "parish") return resolveVar("var(--parish)");
-  if(d.type === "parishward") return resolveVar("var(--parishward)");
-  if(d.type === "party") return resolveVar(partyColor(d.name));
-  return "#999";
-}
-function symbolFor(d){
-  const gen = d3.symbol().size(d.type === "party" ? 220 : 170);
-  if(d.type === "ward") gen.type(d3.symbolSquare);
-  else if(d.type === "parish") gen.type(d3.symbolTriangle);
-  else if(d.type === "parishward") gen.type(d3.symbolDiamond);
-  else gen.type(d3.symbolStar);
-  return gen();
+function refreshIcons() {
+  if (window.FontAwesome && window.FontAwesome.dom) window.FontAwesome.dom.i2svg();
 }
 
-// ---------- Render ----------
-function render(data){
-  graphData = data;
-  ensureArrowMarker();
-  zoomLayer.selectAll("g.nodes, g.links, g.labels").remove();
+function relationshipLabel(link, viewer) {      // describes the OTHER person's role, from the viewer's side
+  if (!link.directional) return link.label;
+  const [first, ...rest] = link.label.split('/');
+  return link.source === viewer ? rest.join('/') : first;
+}
 
-  const width = svg.node().clientWidth, height = svg.node().clientHeight;
+function drawNode(g, d) {
+  g.append('circle').attr('class', 'halo').attr('r', 16);
 
-  simulation = d3.forceSimulation(data.nodes)
-    .force("link", d3.forceLink(data.links).id(d=>d.id).distance(linkDistanceByKind).strength(0.7))
-    .force("charge", d3.forceManyBody().strength(-160))
-    .force("center", d3.forceCenter(width/2, height/2))
-    .force("collide", d3.forceCollide(22));
-
-  linkSel = zoomLayer.append("g").attr("class","links").selectAll("line")
-    .data(data.links).join("line")
-    .attr("class", d=>"link "+d.kind)
-    .attr("marker-end", d=> (d.kind==="social" && d.directional) ? "url(#arrow-social)" : null);
-  linkSel.append("title").text(d=>
-    d.kind==="social" ? d.label
-    : d.kind==="boundary" ? "Ward ↔ parish boundary"
-    : d.kind==="parish" && d.position ? d.position
-    : d.kind==="parishward" ? "Parish ward seat"
-    : "");
-
-  const nodeGroup = zoomLayer.append("g").attr("class","nodes");
-  nodeSel = nodeGroup.selectAll("g.node")
-    .data(data.nodes).join("g")
-    .attr("class","node")
-    .style("cursor","pointer")
-    .call(d3.drag()
-      .on("start", (e,d)=>{ if(!e.active) simulation.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
-      .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
-      .on("end", (e,d)=>{ if(!e.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; }))
-    .on("click", (e,d)=> selectNode(d));
-
-  const defs = svg.select("defs.arrow-defs");
-  nodeSel.each(function(d){
-    const g = d3.select(this);
-    if(d.type === "councillor" || d.type === "parishcouncillor"){
-      const r = 9;
-      const parishOnly = d.type === "parishcouncillor";
-      if(d.imageUrl){
-        const clipId = "clip-"+safeId(d.id);
-        defs.append("clipPath").attr("id", clipId).append("circle").attr("r", r);
-        g.append("circle").attr("r", r).attr("fill", colorFor(d));
-        g.append("image")
-          .attr("clip-path", `url(#${clipId})`)
-          .attr("href", d.imageUrl)
-          .attr("x", -r).attr("y", -r).attr("width", r*2).attr("height", r*2)
-          .attr("preserveAspectRatio","xMidYMid slice")
-          .on("error", function(){ d3.select(this).remove(); });
-        g.append("circle").attr("r", r).attr("fill","none")
-          .attr("stroke", colorFor(d)).attr("stroke-width", 2)
-          .attr("stroke-dasharray", parishOnly ? "3,2" : null);
-      } else if(parishOnly){
-        g.append("circle").attr("r", r).attr("fill","var(--paper)")
-          .attr("stroke", colorFor(d)).attr("stroke-width", 2).attr("stroke-dasharray","3,2");
-      } else {
-        g.append("circle").attr("r", r).attr("fill", colorFor(d)).attr("stroke","var(--paper)").attr("stroke-width", 1.2);
-      }
+  if (d.kind === 'person') {
+    const r = 9, color = personColor(d);
+    if (d.picture) {
+      const clipId = 'clip-' + d.uid.replace(/[^\w-]/g, '_');
+      defs.append('clipPath').attr('id', clipId).append('circle').attr('r', r);
+      g.append('circle').attr('r', r).style('fill', color);
+      g.append('image').attr('clip-path', `url(#${clipId})`).attr('href', d.picture)
+        .attr('x', -r).attr('y', -r).attr('width', 2 * r).attr('height', 2 * r)
+        .attr('preserveAspectRatio', 'xMidYMid slice')
+        .on('error', function () { d3.select(this).remove(); });
+      g.append('circle').attr('r', r).style('fill', 'none').style('stroke', color).style('stroke-width', 2)
+        .style('stroke-dasharray', d.hasSeat ? null : '3,2');
+    } else if (d.hasSeat) {
+      g.append('circle').attr('r', r).style('fill', color).style('stroke', 'var(--paper)').style('stroke-width', 1.2);
     } else {
-      g.append("path").attr("d", symbolFor(d)).attr("fill", colorFor(d)).attr("stroke","var(--paper)").attr("stroke-width", 1.2);
+      g.append('circle').attr('r', r).style('fill', 'var(--paper)').style('stroke', color)
+        .style('stroke-width', 2).style('stroke-dasharray', '3,2');
     }
-  });
-
-  labelSel = zoomLayer.append("g").attr("class","labels").selectAll("text")
-    .data(data.nodes).join("text")
-    .attr("class","node-label")
-    .text(d=> d.name)
-    .attr("dx", 10).attr("dy", 4);
-
-  simulation.on("tick", ()=>{
-    linkSel.attr("x1", d=>d.source.x).attr("y1", d=>d.source.y).attr("x2", d=>d.target.x).attr("y2", d=>d.target.y);
-    nodeSel.attr("transform", d=>`translate(${d.x},${d.y})`);
-    labelSel.attr("x", d=>d.x).attr("y", d=>d.y);
-  });
-
-  buildLegend(data);
-  applyFilters();
-  clearSelection();
-}
-
-// ---------- Legend as filter ----------
-function toggleSetMember(set, value){ set.has(value) ? set.delete(value) : set.add(value); }
-
-function buildLegend(data){
-  const legend = document.getElementById("legend");
-  legend.innerHTML = "";
-
-  const typeRows = [
-    {label:"Councillor", value:"councillor", hollow:false},
-    {label:"Parish Councillor", value:"parishcouncillor", hollow:true},
-    {label:"Ward", value:"ward", hollow:false},
-    {label:"Parish", value:"parish", hollow:false},
-    {label:"Parish Ward", value:"parishward", hollow:false},
-    {label:"Party", value:"party", hollow:false}
-  ];
-  typeRows.forEach(t=>{
-    const isPerson = t.value === "councillor" || t.value === "parishcouncillor";
-    const color = isPerson ? resolveVar("var(--ink-soft)") : colorFor({type:t.value, name:"__generic"});
-    const shapeKind = isPerson ? "circle" : t.value;
-    const row = makeLegendRow(t.label, color, shapeKind, hiddenNodeTypes.has(t.value), t.hollow);
-    row.addEventListener("click", ()=>{
-      toggleSetMember(hiddenNodeTypes, t.value);
-      row.classList.toggle("legend-inactive");
-      refreshSelectionVisibility();
-      relayoutVisible();
-    });
-    legend.appendChild(row);
-  });
-
-  const socialRow = makeLegendRow("Social tie (dashed)", resolveVar("var(--social)"), "line", hiddenLinkKinds.has("social"));
-  socialRow.addEventListener("click", ()=>{
-    toggleSetMember(hiddenLinkKinds, "social");
-    socialRow.classList.toggle("legend-inactive");
-    refreshSelectionVisibility();
-    relayoutVisible();
-  });
-  legend.appendChild(socialRow);
-
-  const boundaryRow = makeLegendRow("Ward ↔ parish boundary", resolveVar("var(--boundary)"), "line", hiddenLinkKinds.has("boundary"));
-  boundaryRow.addEventListener("click", ()=>{
-    toggleSetMember(hiddenLinkKinds, "boundary");
-    boundaryRow.classList.toggle("legend-inactive");
-    refreshSelectionVisibility();
-    relayoutVisible();
-  });
-  legend.appendChild(boundaryRow);
-
-  const parties = [...new Set(data.nodes.filter(n=>n.type==="party").map(n=>n.name))];
-  if(parties.length){
-    const sub = document.createElement("div");
-    sub.className = "legend-sub";
-    const title = document.createElement("div");
-    title.className = "legend-sub-title";
-    title.textContent = "By party";
-    sub.appendChild(title);
-    parties.forEach(p=>{
-      const row = makeLegendRow(p, resolveVar(partyColor(p)), "circle", hiddenParties.has(p), false);
-      row.addEventListener("click", ()=>{
-        toggleSetMember(hiddenParties, p);
-        row.classList.toggle("legend-inactive");
-        refreshSelectionVisibility();
-      relayoutVisible();
-      });
-      sub.appendChild(row);
-    });
-    legend.appendChild(sub);
+    return;
   }
+
+  // entity: a rounded badge in its colour with a Font Awesome icon on top
+  g.append('rect').attr('x', -10).attr('y', -10).attr('width', 20).attr('height', 20).attr('rx', 5)
+    .style('fill', d.color).style('stroke', 'var(--paper)').style('stroke-width', 1.2);
+  g.append('foreignObject').attr('x', -10).attr('y', -10).attr('width', 20).attr('height', 20)
+    .style('pointer-events', 'none')
+    .append('xhtml:div')
+    .style('width', '100%').style('height', '100%').style('display', 'flex')
+    .style('align-items', 'center').style('justify-content', 'center')
+    .append('xhtml:i').attr('class', d.icon).style('color', '#fff').style('font-size', '10px');
 }
 
-// Builds the legend icon using the same SHAPE as the graph nodes (so they can't drift out of
-// sync), but at a small fixed icon size with breathing room — the graph's own symbol sizes
-// are far too large here, and filling the box edge-to-edge reads as oversized even when small.
-const LEGEND_SYMBOL_TYPES = {ward: d3.symbolSquare, parish: d3.symbolTriangle, parishward: d3.symbolDiamond, party: d3.symbolStar};
-function makeShapeSwatch(kind, color, hollow){
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svgEl = document.createElementNS(svgNS, "svg");
-  svgEl.setAttribute("width", "18");
-  svgEl.setAttribute("height", "18");
-  svgEl.setAttribute("viewBox", "-9 -9 18 18");
-  svgEl.style.flexShrink = "0";
-  svgEl.style.display = "block";
-  const pathEl = document.createElementNS(svgNS, "path");
-  const symbolType = kind === "circle" ? d3.symbolCircle : (LEGEND_SYMBOL_TYPES[kind] || d3.symbolCircle);
-  const size = kind === "party" ? 24 : kind === "circle" ? 14 : 18;
-  const d = d3.symbol().type(symbolType).size(size)();
-  pathEl.setAttribute("d", d);
-  pathEl.setAttribute("fill", hollow ? "none" : color);
-  pathEl.setAttribute("stroke", color);
-  pathEl.setAttribute("stroke-width", hollow ? "1.4" : "1");
-  svgEl.appendChild(pathEl);
-  return svgEl;
+function draw(model) {
+  world.selectAll('*').remove();
+  defs.selectAll('clipPath').remove();
+
+  linkSel = world.append('g').selectAll('line').data(model.links).join('line')
+    .attr('class', d => 'link ' + d.kind)
+    .attr('marker-end', d => (d.kind === 'relationship' && d.directional ? 'url(#arrow)' : null));
+  linkSel.append('title').text(d => d.label || '');
+
+  nodeSel = world.append('g').selectAll('g').data(model.nodes).join('g')
+    .attr('class', 'node').style('cursor', 'pointer')
+    .call(drag)
+    .on('click', (e, d) => { e.stopPropagation(); select(d); });
+  nodeSel.each(function (d) { drawNode(d3.select(this), d); });
+
+  labelSel = world.append('g').selectAll('text').data(model.nodes).join('text')
+    .attr('class', 'node-label').attr('dx', 13).attr('dy', 4).text(d => d.name);
+
+  setFrozen(false);
+  startSimulation(model.nodes, model.links, 1);
+  refreshIcons();
 }
 
-function makeLegendRow(label, color, shapeKind, inactive, hollow){
-  const row = document.createElement("div");
-  row.className = "legend-row" + (inactive ? " legend-inactive" : "");
-  if(shapeKind === "line"){
-    const sw = document.createElement("span");
-    sw.className = "legend-swatch";
-    sw.style.background = "none";
-    sw.style.borderTop = `2px dashed ${color}`;
-    sw.style.height = "0";
-    sw.style.marginTop = "6px";
-    sw.style.width = "16px";
-    row.appendChild(sw);
+function ticked() {
+  linkSel.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+         .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+  nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  labelSel.attr('x', d => d.x).attr('y', d => d.y);
+}
+
+/* ---- layout: a force simulation over whichever nodes and links we hand it ---- */
+function startSimulation(nodes, links, alpha) {
+  if (sim) sim.stop();
+  sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).distance(l => CONFIG.linkDistance[l.kind] || 80))
+    .force('charge', d3.forceManyBody().strength(-160))
+    .force('center', d3.forceCenter(width() / 2, height() / 2))
+    .force('collide', d3.forceCollide(22))
+    .alpha(alpha)
+    .on('tick', ticked);
+}
+
+// Re-run the layout using only what is currently visible, so hidden nodes cannot push visible ones around.
+function relayout(pin) {
+  if (!state.model) return;
+  const nodes = state.model.nodes.filter(isNodeVisible);
+  const links = state.model.links.filter(isLinkVisible);
+  nodes.forEach(n => { n.fx = null; n.fy = null; });
+  if (pin) { pin.fx = pin.x; pin.fy = pin.y; }     // the selected node stays put; everything else settles round it
+  setFrozen(false);
+  startSimulation(nodes, links, 0.9);
+}
+
+/* ---- visibility: show / hide according to the filters and the current selection ---- */
+function applyVisibility() {
+  if (!nodeSel) return;
+  const shade = state.reachMap ? d3.interpolateRgb(cssVar('--ink', '#1B2430'), cssVar('--line', '#C7CDC9')) : null;
+
+  nodeSel.style('display', d => (isNodeVisible(d) ? null : 'none')).classed('selected', d => d === state.selected);
+  labelSel.style('display', d => (isNodeVisible(d) ? null : 'none')).classed('selected', d => d === state.selected);
+  linkSel.style('display', d => (isLinkVisible(d) ? null : 'none'))
+    .style('stroke', d => {                         // lines darken toward the selected item and fade with distance
+      if (!shade || d.kind === 'relationship') return null;
+      const steps = Math.max(state.reachMap.get(d.source) || 0, state.reachMap.get(d.target) || 0);
+      const t = state.range > 1 ? (steps - 1) / (state.range - 1) : 0;
+      return shade(Math.min(Math.max(t, 0), 1));
+    });
+}
+
+function refresh() {
+  if (state.selected && isFiltered(state.selected)) state.selected = null;   // a hidden node cannot stay selected
+  state.reachMap = state.selected ? reach(state.selected, state.range, canCross) : null;
+  applyVisibility();
+  showInfo(state.selected);
+}
+
+function select(node) {
+  state.selected = node;
+  refresh();
+  if (state.frozen) relayout(node);
+  const k = d3.zoomTransform(svg.node()).k;
+  svg.transition().duration(600)
+    .call(zoom.transform, d3.zoomIdentity.translate(width() / 2 - node.x * k, height() / 2 - node.y * k).scale(k));
+}
+
+function clearSelection() {
+  state.selected = null;
+  refresh();
+}
+
+/* =====================================================================
+   7. THE LEGEND — every row is a filter
+   ===================================================================== */
+function iconSwatch(color, icon) {
+  const el = document.createElement('div');
+  el.className = 'swatch';
+  el.style.background = color;
+  const i = document.createElement('i');
+  i.className = icon;
+  el.append(i);
+  return el;
+}
+function circleSwatch(color, hollow) {
+  const el = document.createElement('div');
+  el.className = 'swatch round' + (hollow ? ' hollow' : '');
+  if (hollow) el.style.borderColor = color; else el.style.background = color;
+  return el;
+}
+function lineSwatch(kind) {
+  const el = document.createElement('span');
+  el.className = 'swatch-line ' + kind;
+  return el;
+}
+
+function addLegendRow(parent, swatch, label, count, set, key) {
+  const row = document.createElement('div');
+  row.className = 'legend-row' + (set.has(key) ? ' off' : '');
+  const text = document.createElement('span');
+  text.className = 'legend-label';
+  text.textContent = label;
+  const number = document.createElement('span');
+  number.className = 'legend-count';
+  number.textContent = count;
+  row.append(swatch, text, number);
+  row.addEventListener('click', () => {
+    if (set.has(key)) set.delete(key); else set.add(key);
+    row.classList.toggle('off');
+    refresh();
+    relayout();
+  });
+  parent.append(row);
+}
+
+function buildLegend() {
+  const root = $('legend');
+  root.innerHTML = '';
+  const { nodes, links, entityTypes, typeStyles } = state.model;
+  const count = test => nodes.reduce((n, node) => n + (test(node) ? 1 : 0), 0);
+  const ink = cssVar('--ink-soft', '#4A5568');
+
+  addLegendRow(root, circleSwatch(ink, false), `Person (has a ${CONFIG.seatType})`,
+    count(n => n.kind === 'person' && n.hasSeat), state.hiddenTypes, PERSON_WITH_SEAT);
+  addLegendRow(root, circleSwatch(ink, true), `Person (no ${CONFIG.seatType})`,
+    count(n => n.kind === 'person' && !n.hasSeat), state.hiddenTypes, PERSON_NO_SEAT);
+
+  for (const type of entityTypes) {
+    const style = typeStyles.get(type);
+    addLegendRow(root, iconSwatch(style.color, style.icon), type, count(n => n.type === type), state.hiddenTypes, type);
+  }
+
+  addLegendRow(root, lineSwatch('relationship'), 'Relationship (dashed)',
+    links.filter(l => l.kind === 'relationship').length, state.hiddenKinds, 'relationship');
+  addLegendRow(root, lineSwatch('connection'), 'Connection (dotted)',
+    links.filter(l => l.kind === 'connection').length, state.hiddenKinds, 'connection');
+
+  const colorEntities = nodes.filter(n => n.kind === 'entity' && n.type === CONFIG.personColorType)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (colorEntities.length) {
+    const sub = document.createElement('div');
+    sub.className = 'legend-sub';
+    const title = document.createElement('div');
+    title.className = 'legend-sub-title';
+    title.textContent = 'By ' + CONFIG.personColorType.toLowerCase();
+    sub.append(title);
+    for (const entity of colorEntities) {
+      addLegendRow(sub, circleSwatch(entity.color, false), entity.name,
+        count(n => n.kind === 'person' && n.colorEntity === entity), state.hiddenNodes, entity.uid);
+    }
+    root.append(sub);
+  }
+  refreshIcons();
+}
+
+/* =====================================================================
+   8. THE INFO PANEL
+   ===================================================================== */
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = s => String(s).replace(/[&<>"']/g, c => ESC[c]);
+
+function groupConnections(node) {
+  const groups = new Map();
+  for (const link of node.links) {
+    const other = otherEnd(link, node);
+    if (isFiltered(other)) continue;
+    const label = link.kind === 'relationship' ? 'Relationships'
+                : link.kind === 'connection'   ? 'Connected to'
+                : other.kind === 'person'      ? 'People'
+                : other.type;
+    const note = link.kind === 'relationship' ? relationshipLabel(link, node) : link.label;
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push({ node: other, note });
+  }
+  const rank = label => label === 'People' ? -1
+                      : label === 'Connected to' ? 998
+                      : label === 'Relationships' ? 999
+                      : (i => (i < 0 ? 500 : i))(CONFIG.typeOrder.indexOf(label));
+  return [...groups]
+    .map(([label, items]) => ({ label, items: items.sort((a, b) => a.node.name.localeCompare(b.node.name)) }))
+    .sort((a, b) => rank(a.label) - rank(b.label) || a.label.localeCompare(b.label));
+}
+
+function showInfo(node) {
+  const el = $('detail');
+  if (!node) {
+    el.innerHTML = '<div class="empty">Click any person or entity to see how it connects and to centre the diagram on it. Drag nodes to rearrange; scroll or pinch to zoom.</div>';
+    return;
+  }
+  const badges = [];
+  if (node.kind === 'person' && !node.hasSeat) badges.push(`No ${CONFIG.seatType} role`);
+  if (node.kind === 'entity' && node.funding) badges.push(`Funding: ${node.funding}`);
+
+  el.innerHTML =
+    (node.kind === 'person' && node.picture ? `<img class="portrait" src="${esc(node.picture)}" alt="">` : '') +
+    `<p class="name">${esc(node.name)}</p>` +
+    `<p class="kind">${esc(node.kind === 'person' ? 'person' : node.type)}</p>` +
+    (node.comments ? `<p class="comment">${esc(node.comments)}</p>` : '') +
+    badges.map(b => `<span class="badge">${esc(b)}</span>`).join('') +
+    groupConnections(node).map(g =>
+      `<div class="rel-group"><div class="rel-label">${esc(g.label)}</div>` +
+      g.items.map(i => `<div class="rel-item" data-uid="${esc(i.node.uid)}">${esc(i.node.name)}` +
+        (i.note ? ` <span class="rel-note">— ${esc(i.note)}</span>` : '') + '</div>').join('') +
+      '</div>').join('');
+
+  const img = el.querySelector('img.portrait');
+  if (img) img.addEventListener('error', () => img.remove());
+  el.querySelectorAll('.rel-item').forEach(item =>
+    item.addEventListener('click', () => select(state.model.byUid.get(item.dataset.uid))));
+}
+
+/* =====================================================================
+   9. LOADING DATA
+   ===================================================================== */
+const parseCsv = text => Papa.parse(text.replace(/^\ufeff/, ''), {
+  header: true, skipEmptyLines: 'greedy', transformHeader: h => h.trim(),
+}).data;
+
+function decodeBytes(buffer) {   // UTF-8 if valid, otherwise Windows-1252 (what Excel's plain "CSV" saves as)
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buffer); }
+  catch (_) { return new TextDecoder('windows-1252').decode(buffer); }
+}
+
+let loadMessage = '';
+function renderStatus() {
+  const problems = state.model ? state.model.problems : [];
+  $('status').innerHTML = esc(loadMessage) +
+    (problems.length ? ` <span class="warn">⚠ ${problems.length} row${problems.length === 1 ? '' : 's'} skipped — see the browser console for details.</span>` : '');
+  if (problems.length) console.warn('Rows skipped while building the graph:\n' + problems.join('\n'));
+}
+
+function rebuild() {
+  state.model = buildModel(tables);
+  state.selected = null;
+  state.reachMap = null;
+  draw(state.model);
+  buildLegend();
+  refresh();
+  renderStatus();
+}
+
+function setTable(key, text) {
+  tables[key] = parseCsv(text);
+  loadMessage = `Loaded ${TABLES.find(t => t.key === key).file} from your computer.`;
+  rebuild();
+}
+
+function useSample() {
+  for (const t of TABLES) tables[t.key] = parseCsv(SAMPLE[t.key]);
+}
+
+async function fetchText(file) {
+  try {
+    const res = await fetch(file, { cache: 'no-store' });
+    return res.ok ? decodeBytes(await res.arrayBuffer()) : null;
+  } catch (_) { return null; }
+}
+
+async function autoLoad() {
+  const found = await Promise.all(TABLES.map(t => fetchText(t.file)));
+  if (found.some(Boolean)) {
+    TABLES.forEach((t, i) => { tables[t.key] = found[i] ? parseCsv(found[i]) : []; });
+    loadMessage = 'Loaded from this folder — ' + TABLES.map((t, i) => t.file + (found[i] ? ' ✓' : ' (not found)')).join(', ') + '.';
   } else {
-    row.appendChild(makeShapeSwatch(shapeKind, color, !!hollow));
-  }
-  const txt = document.createElement("span");
-  txt.textContent = label;
-  row.appendChild(txt);
-  return row;
-}
-
-function isFilteredOut(d){
-  if(hiddenNodeTypes.has(d.type)) return true;
-  if(d.type === "party" && hiddenParties.has(d.name)) return true;
-  if((d.type === "councillor" || d.type === "parishcouncillor") && hiddenParties.has(d.party)) return true;
-  return false;
-}
-function isLinkFilteredOut(l){
-  if(isFilteredOut(l.source) || isFilteredOut(l.target)) return true;
-  if(l.kind === "social" && hiddenLinkKinds.has("social")) return true;
-  if(l.kind === "boundary" && hiddenLinkKinds.has("boundary")) return true;
-  return false;
-}
-function isNodeHidden(d){
-  if(isFilteredOut(d)) return true;
-  if(selectionActive && !activeSet.has(d.id)) return true;
-  return false;
-}
-function isLinkHidden(l){
-  if(isNodeHidden(l.source) || isNodeHidden(l.target)) return true;
-  if(l.kind === "social" && hiddenLinkKinds.has("social")) return true;
-  if(l.kind === "boundary" && hiddenLinkKinds.has("boundary")) return true;
-  return false;
-}
-function applyFilters(){
-  if(!nodeSel) return;
-  nodeSel.style("display", d=> isNodeHidden(d) ? "none" : null);
-  labelSel.style("display", d=> isNodeHidden(d) ? "none" : null);
-  linkSel.style("display", l=> isLinkHidden(l) ? "none" : null);
-  linkSel.style("stroke", l=>{
-    if(l.kind === "social" || !selectionActive) return null; // null = fall back to the CSS default for its kind
-    const dist = linkDistanceFromSelection(l);
-    return dist != null ? colorForDistance(dist, rangeSteps) : null;
-  });
-}
-
-function linkDistanceByKind(l){
-  return l.kind==="party" ? 110 : l.kind==="social" ? 55 : l.kind==="boundary" ? 65 : 75;
-}
-
-// Re-runs the force layout using only the currently visible nodes/links, so hidden or
-// filtered-out items stop pushing the visible ones around. Existing positions of nodes
-// that stay visible are kept as a starting point rather than randomised.
-function relayoutVisible(){
-  if(!graphData || !simulation) return;
-  const visibleNodes = graphData.nodes.filter(n=> !isNodeHidden(n));
-  const visibleLinks = graphData.links.filter(l=> !isLinkHidden(l));
-  const width = svg.node().clientWidth, height = svg.node().clientHeight;
-  simulation.nodes(visibleNodes);
-  simulation.force("center", d3.forceCenter(width/2, height/2));
-  simulation.force("link", d3.forceLink(visibleLinks).id(d=>d.id).distance(linkDistanceByKind).strength(0.7));
-  simulation.alpha(1).restart();
-}
-
-// ---------- Selection, centering, detail panel ----------
-function neighborsOf(d, data){
-  const connected = new Set([d.id]);
-  const relLinks = data.links.filter(l=> l.source.id===d.id || l.target.id===d.id);
-  relLinks.forEach(l=>{ connected.add(l.source.id); connected.add(l.target.id); });
-  return {connected, relLinks};
-}
-
-function centerOn(d){
-  const width = svg.node().clientWidth, height = svg.node().clientHeight;
-  const current = d3.zoomTransform(svg.node());
-  const k = current.k;
-  const tx = width/2 - d.x*k;
-  const ty = height/2 - d.y*k;
-  svg.transition().duration(650).call(zoomBehavior.transform, d3.zoomIdentity.translate(tx,ty).scale(k));
-}
-
-function selectNode(d){
-  currentSelected = d;
-  refreshSelectionVisibility();
-  centerOn(d);
-
-  const {relLinks} = neighborsOf(d, graphData);
-
-  const panel = document.getElementById("detail");
-  const rels = {};
-  relLinks.forEach(l=>{
-    const other = l.source.id===d.id ? l.target : l.source;
-    rels[l.kind] = rels[l.kind] || [];
-    rels[l.kind].push(other);
-  });
-
-  let badges = "";
-  const isPersonNode = d.type === "councillor" || d.type === "parishcouncillor";
-  if(isPersonNode){
-    if(d.type === "parishcouncillor") badges += `<span class="badge">Parish council only — no authority seat</span>`;
-    if(d.councilPosition) badges += `<span class="badge">${d.councilPosition}</span>`;
-    if(d.partyPosition) badges += `<span class="badge">${d.partyPosition}</span>`;
-  }
-
-  let img = "";
-  if(isPersonNode && d.imageUrl){
-    img = `<img class="portrait" src="${d.imageUrl}" onerror="this.remove()">`;
-  }
-
-  let relHtml = "";
-  const kindLabel = {ward:"Ward", parish:"Parishes / boroughs", party:"Party", social:"Social connections", boundary:"Boundary (ward ↔ parish)", parishward:"Parish ward seat"};
-  Object.keys(rels).forEach(k=>{
-    if(k === "social"){
-      relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]}</div>` +
-        relLinks.filter(l=>l.kind==="social").map(l=>{
-          const other = l.source.id===d.id ? l.target : l.source;
-          let label = l.label;
-          if(l.directional && l.label.includes("/")){
-            const parts = l.label.split("/");
-            label = (l.source.id===d.id) ? parts[1] : parts[0];
-          }
-          return `<div class="rel-item" data-id="${other.id}">${other.name} — <em style="color:var(--ink-soft);font-style:normal;">${label}</em></div>`;
-        }).join("") + `</div>`;
-      return;
-    }
-    if(k === "parish"){
-      relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]}</div>` +
-        relLinks.filter(l=>l.kind==="parish").map(l=>{
-          const other = l.source.id===d.id ? l.target : l.source;
-          const posTxt = l.position ? ` — <em style="color:var(--ink-soft);font-style:normal;">${l.position}</em>` : "";
-          return `<div class="rel-item" data-id="${other.id}">${other.name}${posTxt}</div>`;
-        }).join("") + `</div>`;
-      return;
-    }
-    relHtml += `<div class="rel-group"><div class="rel-label">${kindLabel[k]||k}</div>` +
-      rels[k].map(n=>`<div class="rel-item" data-id="${n.id}">${n.name}</div>`).join("") + `</div>`;
-  });
-  if(!isPersonNode){
-    const members = relLinks.map(l=> l.source.id===d.id ? l.target : l.source).filter(n=>n.type==="councillor" || n.type==="parishcouncillor");
-    if(members.length){
-      relHtml = `<div class="rel-group"><div class="rel-label">Councillors</div>` +
-        members.map(n=>`<div class="rel-item" data-id="${n.id}">${n.name}</div>`).join("") + `</div>` + relHtml;
-    }
-  }
-
-  panel.innerHTML = `${img}<p class="name">${d.name}</p><p class="kind">${typeLabel(d.type)}</p>${badges}${relHtml}`;
-  panel.querySelectorAll(".rel-item").forEach(el=>{
-    el.addEventListener("click", ()=>{
-      const target = graphData.nodes.find(n=>n.id===el.dataset.id);
-      if(target) selectNode(target);
-    });
-  });
-}
-
-function clearSelection(){
-  currentSelected = null;
-  refreshSelectionVisibility();
-  document.getElementById("detail").innerHTML =
-    `<div class="empty">Click any person, ward, parish or party to see its connections and centre the diagram on it. Drag nodes to rearrange; scroll to zoom.</div>`;
-}
-svg.on("click", (e)=>{ if(e.target.tagName === "svg") clearSelection(); });
-
-// ---------- CSV loading ----------
-function rebuild(){
-  const data = buildGraph(peopleRows, socialRows, boundaryRows);
-  render(data);
-  if(data.skippedSocial && data.skippedSocial.length){
-    console.warn("Skipped social links (Id not found among people rows):", data.skippedSocial);
-  }
-}
-function loadPeopleText(text){ peopleRows = Papa.parse(text, {header:true, skipEmptyLines:true}).data; rebuild(); }
-function loadSocialText(text){ socialRows = Papa.parse(text, {header:true, skipEmptyLines:true}).data; rebuild(); }
-function loadBoundaryText(text){ boundaryRows = Papa.parse(text, {header:true, skipEmptyLines:true}).data; rebuild(); }
-
-document.getElementById("loadBtn").addEventListener("click", ()=> document.getElementById("fileInput").click());
-document.getElementById("fileInput").addEventListener("change", (e)=>{
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=> loadPeopleText(reader.result);
-  reader.readAsText(file);
-});
-document.getElementById("loadSocialBtn").addEventListener("click", ()=> document.getElementById("socialFileInput").click());
-document.getElementById("socialFileInput").addEventListener("change", (e)=>{
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=> loadSocialText(reader.result);
-  reader.readAsText(file);
-});
-document.getElementById("loadBoundaryBtn").addEventListener("click", ()=> document.getElementById("boundaryFileInput").click());
-document.getElementById("boundaryFileInput").addEventListener("change", (e)=>{
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=> loadBoundaryText(reader.result);
-  reader.readAsText(file);
-});
-document.getElementById("sampleBtn").addEventListener("click", ()=>{
-  loadPeopleText(SAMPLE_CSV);
-  loadSocialText(SAMPLE_SOCIAL_CSV);
-  loadBoundaryText(SAMPLE_BOUNDARY_CSV);
-});
-
-const legendPaneEl = document.getElementById("legendPane");
-const detailPaneEl = document.getElementById("detailPane");
-const headerEl = document.querySelector("header");
-const reopenHeaderBtn = document.getElementById("reopenHeaderBtn");
-const reopenAsideBtn = document.getElementById("reopenAsideBtn");
-const reopenDetailBtn = document.getElementById("reopenDetailBtn");
-
-document.getElementById("closeHeaderBtn").addEventListener("click", ()=>{
-  headerEl.style.display = "none";
-  reopenHeaderBtn.style.display = "block";
-  window.dispatchEvent(new Event("resize"));
-});
-reopenHeaderBtn.addEventListener("click", ()=>{
-  headerEl.style.display = "";
-  reopenHeaderBtn.style.display = "none";
-  window.dispatchEvent(new Event("resize"));
-});
-
-document.getElementById("closeAsideBtn").addEventListener("click", ()=>{
-  legendPaneEl.style.display = "none";
-  reopenAsideBtn.style.display = "block";
-  updateSidePanelsVisibility();
-  window.dispatchEvent(new Event("resize"));
-});
-reopenAsideBtn.addEventListener("click", ()=>{
-  legendPaneEl.style.display = "";
-  reopenAsideBtn.style.display = "none";
-  updateSidePanelsVisibility();
-  window.dispatchEvent(new Event("resize"));
-});
-
-document.getElementById("closeDetailBtn").addEventListener("click", ()=>{
-  detailPaneEl.style.display = "none";
-  reopenDetailBtn.style.display = "block";
-  updateSidePanelsVisibility();
-  window.dispatchEvent(new Event("resize"));
-});
-reopenDetailBtn.addEventListener("click", ()=>{
-  detailPaneEl.style.display = "";
-  reopenDetailBtn.style.display = "none";
-  updateSidePanelsVisibility();
-  window.dispatchEvent(new Event("resize"));
-});
-
-function updateSidePanelsVisibility(){
-  const sidePanelsEl = document.getElementById("sidePanels");
-  const bothHidden = legendPaneEl.style.display === "none" && detailPaneEl.style.display === "none";
-  sidePanelsEl.style.display = bothHidden ? "none" : "flex";
-}
-
-document.getElementById("tidyLayoutBtn").addEventListener("click", ()=> relayoutVisible());
-
-const rangeSlider = document.getElementById("rangeSlider");
-const rangeValueEl = document.getElementById("rangeValue");
-rangeSlider.addEventListener("input", ()=>{
-  rangeSteps = parseInt(rangeSlider.value, 10);
-  rangeValueEl.textContent = rangeSteps;
-  if(currentSelected) refreshSelectionVisibility();
-});
-
-async function tryFetchCsv(filename){
-  try{
-    const res = await fetch(filename, {cache:"no-store"});
-    if(!res.ok) return null;
-    const text = await res.text();
-    return Papa.parse(text, {header:true, skipEmptyLines:true}).data;
-  } catch(e){
-    return null; // most likely blocked by the browser's file:// CORS policy — see the note in the reply
-  }
-}
-
-async function autoLoadOrSample(){
-  const statusNote = document.getElementById("statusNote");
-  const defaultNoteText = statusNote.textContent;
-
-  const [people, wards, rels] = await Promise.all([
-    tryFetchCsv("People.csv"),
-    tryFetchCsv("Wards.csv"),
-    tryFetchCsv("Relationships.csv")
-  ]);
-  const foundAny = people || wards || rels;
-
-  if(foundAny){
-    peopleRows = people || [];
-    boundaryRows = wards || [];
-    socialRows = rels || [];
-    const parts = [
-      people ? "People.csv ✓" : "People.csv not found",
-      wards ? "Wards.csv ✓" : "Wards.csv not found",
-      rels ? "Relationships.csv ✓" : "Relationships.csv not found"
-    ];
-    statusNote.textContent = "Auto-loaded from folder — " + parts.join(", ") + ". " + defaultNoteText;
-  } else {
-    peopleRows = Papa.parse(SAMPLE_CSV, {header:true, skipEmptyLines:true}).data;
-    boundaryRows = Papa.parse(SAMPLE_BOUNDARY_CSV, {header:true, skipEmptyLines:true}).data;
-    socialRows = Papa.parse(SAMPLE_SOCIAL_CSV, {header:true, skipEmptyLines:true}).data;
-    statusNote.textContent = "No People.csv / Wards.csv / Relationships.csv found next to this file — showing sample data. " + defaultNoteText;
+    useSample();
+    loadMessage = 'No CSV files found next to this page, so this is sample data.';
   }
   rebuild();
 }
-autoLoadOrSample();
 
-window.addEventListener("resize", ()=>{ if(graphData) render(graphData); });
+/* =====================================================================
+   10. WIRING THE CONTROLS
+   ===================================================================== */
+function setupLoaders() {
+  const bar = $('loaders');
+  for (const t of TABLES) {
+    const button = document.createElement('button');
+    button.className = 'file-btn';
+    button.textContent = t.file;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    button.addEventListener('click', () => input.click());
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      setTable(t.key, decodeBytes(await file.arrayBuffer()));
+      input.value = '';
+    });
+    bar.append(button, input);
+  }
+  const sample = document.createElement('button');
+  sample.className = 'file-btn';
+  sample.textContent = 'Use sample data';
+  sample.addEventListener('click', () => { useSample(); loadMessage = 'Showing sample data.'; rebuild(); });
+  bar.append(sample);
+}
+
+function setupPanel(paneId, closeId, reopenId) {
+  const pane = $(paneId), reopen = $(reopenId);
+  const show = visible => {
+    pane.classList.toggle('is-hidden', !visible);
+    reopen.classList.toggle('is-shown', !visible);
+    $('sidePanels').classList.toggle('is-hidden', $('legendPane').classList.contains('is-hidden') && $('infoPane').classList.contains('is-hidden'));
+  };
+  $(closeId).addEventListener('click', () => show(false));
+  reopen.addEventListener('click', () => show(true));
+}
+
+setupLoaders();
+setupPanel('controls', 'closeControls', 'reopenControls');
+setupPanel('legendPane', 'closeLegend', 'reopenLegend');
+setupPanel('infoPane', 'closeInfo', 'reopenInfo');
+$('tidyBtn').addEventListener('click', () => relayout());
+$('rangeSlider').addEventListener('input', e => {
+  state.range = parseInt(e.target.value, 10);
+  $('rangeValue').textContent = state.range;
+  refresh();
+});
+
+const ready = autoLoad();
 </script>
 </body>
 </html>
