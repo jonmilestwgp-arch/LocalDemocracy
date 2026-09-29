@@ -1,0 +1,6 @@
+EntityType,Color,Icon
+Council,#4B5FA6,fa-solid fa-landmark
+Ward,#8A8F85,fa-solid fa-square
+Parish,#6E7F5C,fa-solid fa-tree
+ParishWard,#B08B3D,fa-solid fa-gem
+Party,#7C6A9C,fa-solid fa-flag
